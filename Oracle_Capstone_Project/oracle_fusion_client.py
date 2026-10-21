@@ -10,6 +10,7 @@ class OracleFusionClient(ABC):
     """
     Abstract interface for communicating with Oracle Fusion Cloud.
     Supports fetching ledgers, period statuses, costing transactions, and closing periods.
+    Also exposes AP/AR subledger accounting status and inventory transfer status queries.
     """
     @abstractmethod
     def get_ledgers(self):
@@ -29,6 +30,33 @@ class OracleFusionClient(ABC):
     @abstractmethod
     def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
         """Attempt to close a period for a specific application (GL or COST)."""
+        pass
+
+    @abstractmethod
+    def get_ap_transactions(self, ledger_id: str, period_name: str):
+        """
+        Return AP invoices that are unaccounted or accounted-but-not-transferred to GL.
+        Each record must include at minimum:
+          record_id, module, period, accounting_status, transfer_status, next_step
+        """
+        pass
+
+    @abstractmethod
+    def get_ar_transactions(self, ledger_id: str, period_name: str):
+        """
+        Return AR invoices that are unaccounted or accounted-but-not-transferred to GL.
+        Same shape as AP records.
+        """
+        pass
+
+    @abstractmethod
+    def get_inventory_transactions(self, ledger_id: str, period_name: str):
+        """
+        Return inventory transactions that are not yet transferred to Cost Management,
+        or transferred but not yet costed (where the configuration exposes that state).
+        Each record must include:
+          record_id, module, period, transfer_status, costing_status, next_step
+        """
         pass
 
 
@@ -123,7 +151,7 @@ class RealOracleFusionClient(OracleFusionClient):
     def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
         app_id = 101 if application == "GL" else 10078
         endpoint = f"fscmRestApp/resources/11.13.18.05/ledgerPeriods"
-        
+
         payload = {
             "LedgerId": int(ledger_id),
             "PeriodName": period_name,
@@ -138,11 +166,59 @@ class RealOracleFusionClient(OracleFusionClient):
             logger.error(f"Failed to close period via REST API: {e}")
             raise Exception(f"Failed to close period: {str(e)}")
 
+    def get_ap_transactions(self, ledger_id: str, period_name: str):
+        # AP: unaccounted invoices (AccountingStatus != ACCOUNTED)
+        # AP: accounted but not transferred to GL (TransferToGLStatus != TRANSFERRED)
+        ap_endpoint = (
+            f"fscmRestApp/resources/11.13.18.05/apInvoices"
+            f"?q=LedgerId={ledger_id} and PeriodName='{period_name}'"
+            f" and (AccountingStatus!='ACCOUNTED' or TransferToGLStatus!='TRANSFERRED')"
+            f"&onlyData=true"
+        )
+        try:
+            response = self._make_request(ap_endpoint)
+            return response.get("items", [])
+        except Exception as e:
+            logger.error(f"Failed to query AP transactions: {e}")
+            return []
+
+    def get_ar_transactions(self, ledger_id: str, period_name: str):
+        # AR: same conditions — unaccounted or not transferred to GL
+        ar_endpoint = (
+            f"fscmRestApp/resources/11.13.18.05/arTransactions"
+            f"?q=LedgerId={ledger_id} and PeriodName='{period_name}'"
+            f" and (AccountingStatus!='ACCOUNTED' or TransferToGLStatus!='TRANSFERRED')"
+            f"&onlyData=true"
+        )
+        try:
+            response = self._make_request(ar_endpoint)
+            return response.get("items", [])
+        except Exception as e:
+            logger.error(f"Failed to query AR transactions: {e}")
+            return []
+
+    def get_inventory_transactions(self, ledger_id: str, period_name: str):
+        # Inventory: not transferred to Cost Management, or transferred but not yet costed
+        inv_endpoint = (
+            f"fscmRestApp/resources/11.13.18.05/inventoryTransactions"
+            f"?q=LedgerId={ledger_id} and PeriodName='{period_name}'"
+            f" and (TransferToCostMgmtStatus!='TRANSFERRED' or CostingStatus='NOT_COSTED')"
+            f"&onlyData=true"
+        )
+        try:
+            response = self._make_request(inv_endpoint)
+            return response.get("items", [])
+        except Exception as e:
+            logger.error(f"Failed to query inventory transactions: {e}")
+            return []
+
 
 class MockOracleFusionClient(OracleFusionClient):
     """
     Mock Oracle Fusion client that simulates a real ERP environment.
     Contains complex realistic scenarios, specifically highlighting purchase order receipts in costing.
+    Also contains an 8-case test-pack dataset covering AP, AR and Inventory unaccounted /
+    not-transferred / not-costed states for period-close validation testing.
     """
     def __init__(self, scenario_name: str = "default"):
         self.scenario_name = scenario_name
@@ -217,9 +293,130 @@ class MockOracleFusionClient(OracleFusionClient):
             ]
         }
 
+        # ------------------------------------------------------------------ #
+        # 4. AP transactions for the 8-case test pack (ledger 1001, Dec-24)   #
+        # ------------------------------------------------------------------ #
+        # CASE 1 – AP invoice, unaccounted (accounting not yet created)
+        # CASE 2 – AP invoice, accounted but not yet transferred to GL
+        # CASE 7 – AP invoice, fully processed (negative control – must NOT flag)
+        self.ap_transactions = {
+            "1001": [
+                {
+                    "record_id": "TEST-AP-INV-001",
+                    "module": "Payables",
+                    "period": "Dec-24",
+                    "supplier": "TEST-SUPPLIER-OMEGA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-1",
+                    "accounting_status": "NOT_ACCOUNTED",
+                    "transfer_status": "NOT_TRANSFERRED",
+                    "next_step": "Run Create Accounting for this invoice (accounting not yet created).",
+                },
+                {
+                    "record_id": "TEST-AP-INV-002",
+                    "module": "Payables",
+                    "period": "Dec-24",
+                    "supplier": "TEST-SUPPLIER-OMEGA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-2",
+                    "accounting_status": "ACCOUNTED",
+                    "transfer_status": "NOT_TRANSFERRED",
+                    "next_step": "Run Transfer Journal Entries to GL for this invoice.",
+                },
+                {
+                    "record_id": "TEST-AP-INV-007",
+                    "module": "Payables",
+                    "period": "Dec-24",
+                    "supplier": "TEST-SUPPLIER-OMEGA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-7",
+                    "accounting_status": "ACCOUNTED",
+                    "transfer_status": "TRANSFERRED",
+                    "next_step": None,
+                },
+            ]
+        }
+
+        # ------------------------------------------------------------------ #
+        # 5. AR transactions for the 8-case test pack (ledger 1001, Dec-24)   #
+        # ------------------------------------------------------------------ #
+        # CASE 3 – AR invoice, unaccounted
+        # CASE 4 – AR invoice, accounted but not transferred to GL
+        # CASE 8 – AR invoice, fully processed (negative control – must NOT flag)
+        self.ar_transactions = {
+            "1001": [
+                {
+                    "record_id": "TEST-AR-INV-003",
+                    "module": "Receivables",
+                    "period": "Dec-24",
+                    "customer": "TEST-CUSTOMER-ALPHA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-3",
+                    "accounting_status": "NOT_ACCOUNTED",
+                    "transfer_status": "NOT_TRANSFERRED",
+                    "next_step": "Run Create Accounting for this transaction (accounting not yet created).",
+                },
+                {
+                    "record_id": "TEST-AR-INV-004",
+                    "module": "Receivables",
+                    "period": "Dec-24",
+                    "customer": "TEST-CUSTOMER-ALPHA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-4",
+                    "accounting_status": "ACCOUNTED",
+                    "transfer_status": "NOT_TRANSFERRED",
+                    "next_step": "Run Transfer Journal Entries to GL for this transaction.",
+                },
+                {
+                    "record_id": "TEST-AR-INV-008",
+                    "module": "Receivables",
+                    "period": "Dec-24",
+                    "customer": "TEST-CUSTOMER-ALPHA",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-8",
+                    "accounting_status": "ACCOUNTED",
+                    "transfer_status": "TRANSFERRED",
+                    "next_step": None,
+                },
+            ]
+        }
+
+        # ------------------------------------------------------------------ #
+        # 6. Inventory transactions for the 8-case test pack                  #
+        # ------------------------------------------------------------------ #
+        # CASE 5 – Receipt approved, NOT yet transferred to Cost Management
+        # CASE 6 – Receipt transferred to Cost Management but NOT yet costed
+        # (Cases 7 & 8 negative controls are covered in AP/AR tables above)
+        self.inventory_transactions = {
+            "1001": [
+                {
+                    "record_id": "TEST-INV-RCT-005",
+                    "module": "Inventory / Cost Management",
+                    "period": "Dec-24",
+                    "organization": "TEST-ORG-M1",
+                    "item": "TEST-ITEM-XZ100",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-5",
+                    "transfer_status": "NOT_TRANSFERRED",
+                    "costing_status": "NOT_COSTED",
+                    "next_step": (
+                        "Transfer inventory transaction to Cost Management "
+                        "(cost processor has not yet picked up this receipt)."
+                    ),
+                },
+                {
+                    "record_id": "TEST-INV-RCT-006",
+                    "module": "Inventory / Cost Management",
+                    "period": "Dec-24",
+                    "organization": "TEST-ORG-M1",
+                    "item": "TEST-ITEM-XZ100",
+                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-6",
+                    "transfer_status": "TRANSFERRED",
+                    "costing_status": "NOT_COSTED",
+                    "next_step": (
+                        "Cost this transaction in Cost Management "
+                        "(transferred but cost processor has not completed costing)."
+                    ),
+                },
+            ]
+        }
+
         # Adapt mock database based on the active scenario
         if self.scenario_name == "all_clear":
-            # Fix all errors
+            # Fix all costing errors
             for ledger_id in self.transactions:
                 for txn in self.transactions[ledger_id]:
                     txn["costing_status"] = "COSTED"
@@ -246,7 +443,7 @@ class MockOracleFusionClient(OracleFusionClient):
     def get_costing_transactions(self, ledger_id: str, period_name: str):
         if period_name != "Dec-24":
             return []
-        
+
         txns = self.transactions.get(ledger_id, [])
         blockers = []
         for t in txns:
@@ -257,17 +454,47 @@ class MockOracleFusionClient(OracleFusionClient):
     def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
         if period_name != "Dec-Dec-24" and period_name != "Dec-24":
             raise Exception("Cannot close periods other than 'Dec-24' in mock environment.")
-            
+
         blockers = self.get_costing_transactions(ledger_id, period_name)
         if application == "COST" and blockers:
             raise Exception(f"Cannot close costing period: {len(blockers)} unprocessed or errored transactions exist.")
-            
+
         if application == "GL":
             stat = self.get_period_statuses(ledger_id, period_name)
             if stat.get("COST") != "Closed":
                 raise Exception(f"Cannot close GL period: Costing period must be closed first.")
-                
+
         if ledger_id in self.period_statuses:
             self.period_statuses[ledger_id][application] = "Closed"
             return True
         return False
+
+    def get_ap_transactions(self, ledger_id: str, period_name: str):
+        if period_name != "Dec-24":
+            return []
+        records = self.ap_transactions.get(ledger_id, [])
+        flags = []
+        for r in records:
+            if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
+                flags.append(r)
+        return flags
+
+    def get_ar_transactions(self, ledger_id: str, period_name: str):
+        if period_name != "Dec-24":
+            return []
+        records = self.ar_transactions.get(ledger_id, [])
+        flags = []
+        for r in records:
+            if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
+                flags.append(r)
+        return flags
+
+    def get_inventory_transactions(self, ledger_id: str, period_name: str):
+        if period_name != "Dec-24":
+            return []
+        records = self.inventory_transactions.get(ledger_id, [])
+        flags = []
+        for r in records:
+            if r["transfer_status"] != "TRANSFERRED" or r["costing_status"] == "NOT_COSTED":
+                flags.append(r)
+        return flags
