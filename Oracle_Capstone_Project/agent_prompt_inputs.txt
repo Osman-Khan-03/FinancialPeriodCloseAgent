@@ -1,0 +1,332 @@
+================================================================================
+  AGENT PROMPT INPUTS — Oracle Financial Period Close Agent
+  Use this file to copy-paste responses to the agent's opening question.
+================================================================================
+
+The agent asks:
+  "Which Oracle environment, ledger or ledger set, and accounting period would
+   you like me to assess? Please also confirm whether you want a readiness
+   check, a close request, or a status inquiry."
+
+The three action types explained:
+  READINESS CHECK  — Agent scans all modules for blockers. Read-only.
+                     No periods are changed. Use this first to see what is wrong.
+  CLOSE REQUEST    — Agent runs the readiness check and, if everything passes,
+                     closes Costing then GL. Requires your explicit confirmation.
+  STATUS INQUIRY   — Agent reports the current open/closed status of the period
+                     for each ledger without checking for blockers or closing.
+
+Below are ready-to-use input prompts, one per scenario. Each prompt gives the
+agent everything it needs. Copy the text under "PASTE THIS" and send it directly
+to the agent.
+
+================================================================================
+  INPUT 1 — Single Clean Ledger (Expect: Full Success)
+================================================================================
+
+WHAT THIS TESTS:
+  The happy path. One ledger, all transactions clean. The agent should confirm
+  readiness and close both Costing and GL with no issues.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Oct-24
+Action      : Close Request
+
+Please run the readiness assessment and, if all checks pass, close the
+Costing period followed by the General Ledger period for Oct-24.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Readiness check: PASS on all modules (Costing, AP, AR, Inventory).
+  - Action: Close Costing period for Ledger 1001, Oct-24.
+  - Action: Close GL period for Ledger 1001, Oct-24.
+  - Final status: SUCCESS — Period Oct-24 fully closed.
+
+================================================================================
+  INPUT 2 — All Three Ledgers, All Clean (Expect: Full Success Across All)
+================================================================================
+
+WHAT THIS TESTS:
+  Multi-ledger happy path. US, UK, and Canada all clean. The agent should
+  process each ledger independently and close all three.
+
+PASTE THIS:
+-----------
+Environment  : Oracle Fusion Cloud Financials
+Ledger Set   : Global Ledger Set
+Ledgers      : US Primary Ledger (1001), UK Primary Ledger (1002),
+               Canada Primary Ledger (1003)
+Period       : Nov-24
+Action       : Close Request
+
+Please run the readiness assessment across all three ledgers and close
+Costing and GL periods for each once confirmed clear.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Ledger 1001 (US): SUCCESS — Costing Closed, GL Closed.
+  - Ledger 1002 (UK): SUCCESS — Costing Closed, GL Closed.
+  - Ledger 1003 (CA): SUCCESS — Costing Closed, GL Closed.
+  - Overall status: COMPLETED.
+
+================================================================================
+  INPUT 3 — Single Ledger, Costing Blocked (Missing Item Cost Definition)
+================================================================================
+
+WHAT THIS TESTS:
+  A costing error on a PO receipt blocks both the Costing period and the GL
+  period. The agent should identify the exact transaction, explain the root
+  cause, and refuse to close until it is resolved.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Dec-24
+Action      : Readiness Check
+
+There is a known issue with a PO receipt in Cost Management. Please run
+the readiness assessment and report any blockers before attempting to close.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Readiness check: FAIL — Costing blocker found.
+  - Blocker: TXN_COST_002 | PO: PO-2024-002 | Receipt: RC-99012 |
+             Item: CN-90812 | Qty: 50 Box
+             Costing Status: ERROR
+             Accounting Status: NOT_ACCOUNTED
+             Error: "Item cost definition is missing for item 'CN-90812'
+                     in US Cost Book."
+  - Close Costing period: BLOCKED.
+  - Close GL period: BLOCKED (Costing must close first).
+  - Recommended next step: Define cost profile for CN-90812 in the US
+    Cost Book via Cost Management > Manage Item Costs, then re-run the
+    cost processor for Receipt RC-99012.
+
+================================================================================
+  INPUT 4 — Single Ledger, Accounting Rule Violation (UK Subledger Error)
+================================================================================
+
+WHAT THIS TESTS:
+  A receipt is costed correctly but the subledger journal fails to generate
+  because the account combination violates a dynamic insertion rule. The agent
+  should surface the exact rule name and guide the user to the right fix.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : UK Primary Ledger (Ledger ID: 1002)
+Period      : Dec-24
+Action      : Readiness Check
+
+Costing has completed but we believe there is an accounting error on a
+receipt in the UK ledger. Please run the readiness assessment and report
+any blockers.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Readiness check: FAIL — Accounting blocker found.
+  - Blocker: TXN_COST_101 | PO: PO-2024-003 | Receipt: RC-99013 |
+             Item: AS54888 | Qty: 10 Ea
+             Costing Status: COSTED
+             Accounting Status: ERROR
+             Error: "Subledger Journal Entry violates dynamic account
+                     combination rule 'UK_ACC_RULE'."
+  - Close Costing period: BLOCKED.
+  - Close GL period: BLOCKED.
+  - Recommended next step: Review account derivation rule 'UK_ACC_RULE'
+    in Manage Subledger Accounting Options. Correct the cost account
+    mapping for item AS54888 in the UK cost org, then re-run Create
+    Accounting for Receipt RC-99013.
+
+================================================================================
+  INPUT 5 — AP Invoice Not Accounted (Payables Blocker)
+================================================================================
+
+WHAT THIS TESTS:
+  Costing is clean. The GL cannot close because an AP invoice has never had
+  its accounting journal created. The agent should identify the invoice and
+  direct the user to run Create Accounting in Payables.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Dec-24
+Action      : Readiness Check
+
+Costing looks fine but we have an unaccounted Payables invoice blocking
+the GL close. Please assess and advise.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Costing check: PASS — no costing blockers.
+  - AP check: FAIL — 1 unaccounted invoice found.
+  - Blocker: AP-INV-B301 | Supplier: TEST-SUPPLIER-OMEGA | Period: Dec-24
+             Accounting Status: NOT_ACCOUNTED
+             Transfer Status: NOT_TRANSFERRED
+  - Close GL period: BLOCKED — AP invoice must be accounted and transferred.
+  - Recommended next step: Run Create Accounting (Payables) for AP-INV-B301.
+    Then run Transfer Journal Entries to GL.
+
+================================================================================
+  INPUT 6 — AP Invoice Accounted but Not Transferred to GL
+================================================================================
+
+WHAT THIS TESTS:
+  Accounting exists for the AP invoice but the subledger journal was never
+  transferred to the General Ledger. The agent should distinguish this from
+  the "not accounted" state and recommend the Transfer step, not Create Accounting.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Dec-24
+Action      : Readiness Check
+
+We have a Payables invoice that has been accounted but the journal does not
+appear in the General Ledger. Please identify the issue and advise next steps.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - AP check: FAIL — 1 invoice accounted but not transferred.
+  - Blocker: AP-INV-B401 | Supplier: TEST-SUPPLIER-OMEGA | Period: Dec-24
+             Accounting Status: ACCOUNTED
+             Transfer Status: NOT_TRANSFERRED
+  - Close GL period: BLOCKED — journal not yet in GL.
+  - Recommended next step: Run Transfer Journal Entries to GL for AP-INV-B401.
+    Do NOT re-run Create Accounting — accounting already exists.
+
+================================================================================
+  INPUT 7 — Inventory Not Transferred to Cost Management
+================================================================================
+
+WHAT THIS TESTS:
+  An inventory receipt exists in the system but has never been picked up by
+  the cost processor. The agent should identify this as an upstream transfer
+  issue (distinct from a costing error) and block the Costing period close.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Dec-24
+Action      : Readiness Check
+
+We have an inventory receipt that does not appear in Cost Management at all.
+Please assess and tell us what is blocking the Costing period close.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Inventory check: FAIL — receipt not transferred to Cost Management.
+  - Blocker: INV-RCT-B701 | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100
+             Transfer to Cost Mgmt: NOT_TRANSFERRED
+             Costing Status: NOT_COSTED
+  - Close Costing period: BLOCKED.
+  - Close GL period: BLOCKED — Costing must close first.
+  - Recommended next step: Submit Transfer Transactions to Costing process
+    for Org TEST-ORG-M1, Period Dec-24. Confirm the transaction appears
+    in Cost Management before retrying the period close.
+
+================================================================================
+  INPUT 8 — Inventory Transferred but Not Yet Costed
+================================================================================
+
+WHAT THIS TESTS:
+  The receipt is visible in Cost Management (transfer succeeded) but the cost
+  processor has not finished costing it. The agent must distinguish this
+  "transferred but pending costing" state from the "not transferred" state
+  in Input 7 above.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : US Primary Ledger (Ledger ID: 1001)
+Period      : Dec-24
+Action      : Readiness Check
+
+We can see an inventory receipt in Cost Management but it is still showing
+as not costed. Please identify the blocker and advise.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Inventory check: FAIL — receipt transferred but costing incomplete.
+  - Blocker: INV-RCT-B801 | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100
+             Transfer to Cost Mgmt: TRANSFERRED
+             Costing Status: NOT_COSTED
+  - Close Costing period: BLOCKED — costing_status = NOT_COSTED.
+  - Close GL period: BLOCKED — Costing must close first.
+  - Recommended next step: Run Cost Accounting process for TEST-ORG-M1.
+    Verify item TEST-ITEM-XZ100 has a valid cost profile assigned.
+    Confirm costing_status changes to COSTED before retrying.
+
+================================================================================
+  INPUT 9 — Multiple Blockers Across Modules (AP + Inventory)
+================================================================================
+
+WHAT THIS TESTS:
+  The most realistic "end of period" scenario — multiple things are wrong at
+  once across different modules. The agent should surface all blockers,
+  prioritise them correctly (Costing/Inventory first, then AP/AR, then GL),
+  and not attempt any close until all are resolved.
+
+PASTE THIS:
+-----------
+Environment : Oracle Fusion Cloud Financials
+Ledger      : UK Primary Ledger (Ledger ID: 1002)
+Period      : Nov-24
+Action      : Readiness Check
+
+We are approaching period-end and want a full readiness assessment before
+attempting to close. We are aware there may be issues in both Payables and
+Inventory for this ledger and period.
+-----------
+
+EXPECTED AGENT RESPONSE:
+  - Costing (PO receipts): PASS — no PO receipt costing errors.
+  - Inventory check: FAIL — 1 receipt transferred but NOT_COSTED.
+    Blocker: INV-RCT-B901 | Org: UK-PLANT-LON | Item: UK-ITEM-005
+             Transfer: TRANSFERRED | Costing: NOT_COSTED
+    Next step: Run Cost Accounting for UK-PLANT-LON. Assign cost profile
+               to UK-ITEM-005 if missing.
+  - AP check: FAIL — 1 invoice NOT_ACCOUNTED.
+    Blocker: AP-INV-B901 | Supplier: UK-VENDOR-DELTA
+             Accounting: NOT_ACCOUNTED | Transfer: NOT_TRANSFERRED
+    Next step: Run Create Accounting for AP-INV-B901, then Transfer to GL.
+  - Close Costing period: BLOCKED — inventory not fully costed.
+  - Close GL period: BLOCKED — Costing + AP both unresolved.
+  - Priority order to resolve:
+      1. Cost item INV-RCT-B901 in Cost Management (unblocks Costing close).
+      2. Account and transfer AP-INV-B901 (unblocks GL close).
+      3. Retry period close after both items are resolved.
+
+================================================================================
+  QUICK REFERENCE — AGENT INPUT FIELDS
+================================================================================
+
+  Field         | Valid Values
+  --------------|--------------------------------------------------------------
+  Environment   | "Oracle Fusion Cloud Financials"
+                | "Oracle E-Business Suite (EBS)"
+  --------------|--------------------------------------------------------------
+  Ledger        | US Primary Ledger    (Ledger ID: 1001, Currency: USD)
+                | UK Primary Ledger    (Ledger ID: 1002, Currency: GBP)
+                | Canada Primary Ledger(Ledger ID: 1003, Currency: CAD)
+  --------------|--------------------------------------------------------------
+  Ledger Set    | Global Ledger Set    (covers all three ledgers above)
+  --------------|--------------------------------------------------------------
+  Period        | Oct-24   — clean data, all ledgers closeable
+                | Nov-24   — clean data, all ledgers closeable
+                | Dec-24   — blocked data, use for error scenario testing
+  --------------|--------------------------------------------------------------
+  Action        | "Readiness Check"  — scan for blockers, read-only, no changes
+                | "Close Request"    — check then close (requires confirmation)
+                | "Status Inquiry"   — report current open/closed status only
+
+================================================================================
+  END OF AGENT PROMPT INPUTS FILE
+================================================================================

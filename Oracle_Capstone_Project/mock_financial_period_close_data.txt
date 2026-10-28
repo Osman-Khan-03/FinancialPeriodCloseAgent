@@ -1,0 +1,657 @@
+================================================================================
+  MOCK DATA: FINANCIAL PERIOD CLOSE SCENARIOS
+  Oracle Fusion Cloud — Financial Period Close Agent Training Data
+================================================================================
+
+PURPOSE
+-------
+This file contains realistic mock scenarios for multiple financial periods
+across multiple ledgers. Each period entry documents the ledger state, current
+period statuses, any blocking transactions, and whether the period CAN or
+CANNOT be closed. Scenarios are grouped into two sections:
+
+  SECTION A — Periods ABLE to Close   (clean state, no blockers)
+  SECTION B — Periods UNABLE to Close (blocked state, with root-cause details)
+
+The agent should use these examples to understand:
+  1. What a "clean" ledger state looks like before initiating a close.
+  2. What specific blocker conditions prevent a period from closing.
+  3. Which module owns each blocker and what the corrective next step is.
+  4. The correct sequence: Costing must close before General Ledger (GL).
+
+PERIOD CLOSE SEQUENCE (for reference)
+--------------------------------------
+  Step 1 — Resolve all Costing/PO Receipt transaction errors.
+  Step 2 — Close the Costing period (ApplicationId: 10078).
+  Step 3 — Resolve all AP unaccounted / not-transferred-to-GL invoices.
+  Step 4 — Resolve all AR unaccounted / not-transferred-to-GL transactions.
+  Step 5 — Resolve all Inventory transactions not transferred to Cost Mgmt.
+  Step 6 — Close the General Ledger (GL) period (ApplicationId: 101).
+
+================================================================================
+  SECTION A — PERIODS ABLE TO CLOSE
+================================================================================
+
+--------------------------------------------------------------------------------
+SCENARIO A-1
+  Period      : Oct-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : YES
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE] — All costing and accounting statuses are COSTED / ACCOUNTED.
+
+  Transaction Details (all clear):
+    TXN_COST_A101 | PO: PO-2024-0101 | Receipt: RC-10011 | Item: AS54888
+      Qty: 200 Ea | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+    TXN_COST_A102 | PO: PO-2024-0102 | Receipt: RC-10012 | Item: MK-77231
+      Qty: 500 Box | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+AP TRANSACTIONS (Payables):
+  [NONE] — All AP invoices are ACCOUNTED and TRANSFERRED to GL.
+
+  Invoice Details (all clear):
+    AP-INV-A101 | Supplier: ACME-SUPPLIES-INC | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+    AP-INV-A102 | Supplier: GLOBAL-FREIGHT-CO | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+AR TRANSACTIONS (Receivables):
+  [NONE] — All AR invoices are ACCOUNTED and TRANSFERRED to GL.
+
+  Invoice Details (all clear):
+    AR-INV-A101 | Customer: NORTHSTAR-RETAIL | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+    AR-INV-A102 | Customer: EASTPORT-WHOLESALE | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+INVENTORY TRANSACTIONS:
+  [NONE] — All inventory transactions are TRANSFERRED to Cost Management
+           and have Costing Status: COSTED.
+
+  Transaction Details (all clear):
+    INV-RCT-A101 | Org: MFG-PLANT-01 | Item: AS54888 | Period: Oct-24
+      Transfer to Cost Mgmt: TRANSFERRED | Costing: COSTED | Next Step: None
+
+CLOSE ACTIONS:
+  -> Close Costing period for Ledger 1001, Period Oct-24.   [PERMITTED]
+  -> Close GL period for Ledger 1001, Period Oct-24.         [PERMITTED]
+  -> Outcome: SUCCESS — Period Oct-24 fully closed.
+
+--------------------------------------------------------------------------------
+SCENARIO A-2
+  Period      : Oct-24
+  Ledger ID   : 1002
+  Ledger Name : UK Primary Ledger
+  Currency    : GBP
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : YES
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE] — All costing and accounting statuses are COSTED / ACCOUNTED.
+
+  Transaction Details (all clear):
+    TXN_COST_A201 | PO: PO-2024-0201 | Receipt: RC-20011 | Item: UK-ITEM-001
+      Qty: 150 Ea | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+AP TRANSACTIONS (Payables):
+  [NONE] — All AP invoices are ACCOUNTED and TRANSFERRED to GL.
+
+  Invoice Details (all clear):
+    AP-INV-A201 | Supplier: BRIT-IMPORTS-LTD | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+AR TRANSACTIONS (Receivables):
+  [NONE] — All AR invoices are ACCOUNTED and TRANSFERRED to GL.
+
+  Invoice Details (all clear):
+    AR-INV-A201 | Customer: LONDON-TECH-PLC | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+INVENTORY TRANSACTIONS:
+  [NONE] — All inventory transactions are TRANSFERRED and COSTED.
+
+CLOSE ACTIONS:
+  -> Close Costing period for Ledger 1002, Period Oct-24.   [PERMITTED]
+  -> Close GL period for Ledger 1002, Period Oct-24.         [PERMITTED]
+  -> Outcome: SUCCESS — Period Oct-24 fully closed.
+
+--------------------------------------------------------------------------------
+SCENARIO A-3
+  Period      : Oct-24
+  Ledger ID   : 1003
+  Ledger Name : Canada Primary Ledger
+  Currency    : CAD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : YES
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+  Transaction Details (all clear):
+    TXN_COST_A301 | PO: PO-2024-0301 | Receipt: RC-30011 | Item: CAD-ITEM-01
+      Qty: 25 Kg | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+    TXN_COST_A302 | PO: PO-2024-0302 | Receipt: RC-30012 | Item: CAD-ITEM-02
+      Qty: 80 Litre | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+AP TRANSACTIONS (Payables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AP-INV-A301 | Supplier: MAPLE-DIST-INC | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+AR TRANSACTIONS (Receivables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AR-INV-A301 | Customer: TORONTO-INDUSTRIAL | Period: Oct-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+INVENTORY TRANSACTIONS:
+  [NONE]
+
+CLOSE ACTIONS:
+  -> Close Costing period for Ledger 1003, Period Oct-24.   [PERMITTED]
+  -> Close GL period for Ledger 1003, Period Oct-24.         [PERMITTED]
+  -> Outcome: SUCCESS — Period Oct-24 fully closed.
+
+--------------------------------------------------------------------------------
+SCENARIO A-4
+  Period      : Nov-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : YES
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+  Transaction Details (all clear):
+    TXN_COST_A401 | PO: PO-2024-1101 | Receipt: RC-11011 | Item: AS54888
+      Qty: 300 Ea | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+    TXN_COST_A402 | PO: PO-2024-1102 | Receipt: RC-11012 | Item: COMP-CPU-001
+      Qty: 40 Ea  | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+
+AP TRANSACTIONS (Payables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AP-INV-A401 | Supplier: TECH-PARTS-CORP | Period: Nov-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+    AP-INV-A402 | Supplier: NATIONWIDE-3PL   | Period: Nov-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+AR TRANSACTIONS (Receivables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AR-INV-A401 | Customer: WESTCOAST-RETAIL | Period: Nov-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+INVENTORY TRANSACTIONS:
+  [NONE]
+
+  Transaction Details (all clear):
+    INV-RCT-A401 | Org: MFG-PLANT-01 | Item: COMP-CPU-001 | Period: Nov-24
+      Transfer to Cost Mgmt: TRANSFERRED | Costing: COSTED | Next Step: None
+
+CLOSE ACTIONS:
+  -> Close Costing period for Ledger 1001, Period Nov-24.   [PERMITTED]
+  -> Close GL period for Ledger 1001, Period Nov-24.         [PERMITTED]
+  -> Outcome: SUCCESS — Period Nov-24 fully closed.
+
+--------------------------------------------------------------------------------
+SCENARIO A-5
+  Period      : Nov-24
+  Ledger ID   : 1003
+  Ledger Name : Canada Primary Ledger
+  Currency    : CAD
+  GL Status   : Open
+  Cost Status : Already Closed
+  CLOSE READY : YES (GL only remaining)
+--------------------------------------------------------------------------------
+
+NOTE: Costing was closed in a prior run. Only the GL close remains.
+
+COSTING TRANSACTIONS (blockers):
+  [NONE] — Costing period already Closed.
+
+AP TRANSACTIONS (Payables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AP-INV-A501 | Supplier: CANWEST-SUPPLIES | Period: Nov-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+AR TRANSACTIONS (Receivables):
+  [NONE]
+
+  Invoice Details (all clear):
+    AR-INV-A501 | Customer: CALGARY-LOGISTICS | Period: Nov-24
+      Accounting: ACCOUNTED | Transfer: TRANSFERRED | Next Step: None
+
+INVENTORY TRANSACTIONS:
+  [NONE]
+
+CLOSE ACTIONS:
+  -> Costing period already Closed — skip.
+  -> Close GL period for Ledger 1003, Period Nov-24.         [PERMITTED]
+  -> Outcome: SUCCESS — Period Nov-24 GL closed; Costing was already closed.
+
+
+================================================================================
+  SECTION B — PERIODS UNABLE TO CLOSE (BLOCKED)
+================================================================================
+
+--------------------------------------------------------------------------------
+SCENARIO B-1
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : Costing transaction error — missing item cost definition
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    TXN_COST_001 | PO: PO-2024-001 | Receipt: RC-99011 | Item: AS54888
+      Qty: 100 Ea | Costing: COSTED | Accounting: ACCOUNTED | Error: None
+      → This transaction is CLEAN.
+
+    TXN_COST_002 | PO: PO-2024-002 | Receipt: RC-99012 | Item: CN-90812
+      Qty: 50 Box | Costing: ERROR | Accounting: NOT_ACCOUNTED
+      Error: "Item cost definition is missing for item 'CN-90812' in US Cost Book."
+      → ROOT CAUSE: The item CN-90812 has no cost profile assigned in the
+        US Cost Book. The cost processor cannot calculate the standard cost.
+      → NEXT STEP: Navigate to Manage Item Costs in Cost Management.
+        Define a cost profile and standard cost for item CN-90812 in the
+        US Cost Book, then re-run the cost processor for Receipt RC-99012.
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean, but cannot proceed to close AP or GL until Costing is resolved]
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period: BLOCKED — 1 transaction in ERROR state.
+  -> Close GL period: BLOCKED — Costing period must be closed first.
+  -> Outcome: BLOCKED — Resolve costing error on TXN_COST_002 before retrying.
+
+--------------------------------------------------------------------------------
+SCENARIO B-2
+  Period      : Dec-24
+  Ledger ID   : 1002
+  Ledger Name : UK Primary Ledger
+  Currency    : GBP
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : Subledger journal accounting error — dynamic account rule violation
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    TXN_COST_101 | PO: PO-2024-003 | Receipt: RC-99013 | Item: AS54888
+      Qty: 10 Ea | Costing: COSTED | Accounting: ERROR
+      Error: "Subledger Journal Entry violates dynamic account combination
+              rule 'UK_ACC_RULE'."
+      → ROOT CAUSE: The account combination generated for this PO receipt
+        does not satisfy the dynamic insertion rule configured for the UK
+        chart of accounts. The journal cannot be created.
+      → NEXT STEP: Review account derivation rule 'UK_ACC_RULE' in
+        Manage Subledger Accounting Options. Correct the account segment
+        value or the cost account mapping for item AS54888 / UK cost org,
+        then re-run Create Accounting for Receipt RC-99013.
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean]
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period: BLOCKED — 1 transaction with Accounting ERROR.
+  -> Close GL period: BLOCKED — Costing period must be closed first.
+  -> Outcome: BLOCKED — Fix account combination rule violation on TXN_COST_101.
+
+--------------------------------------------------------------------------------
+SCENARIO B-3
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : AP invoice NOT accounted (accounting not yet created)
+--------------------------------------------------------------------------------
+
+NOTE: Costing transactions are all clean. The blocker is in Payables.
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+AP TRANSACTIONS (Payables):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    AP-INV-B301 | Supplier: TEST-SUPPLIER-OMEGA | Period: Dec-24
+      Accounting: NOT_ACCOUNTED | Transfer: NOT_TRANSFERRED
+      Description: Invoice entered and validated; no accounting journal created yet.
+      → ROOT CAUSE: The Create Accounting process has not been run for this
+        invoice, or it was skipped due to a validation hold.
+      → NEXT STEP: Run Create Accounting (Payables) for invoice AP-INV-B301.
+        Navigate to: Payables > Accounting > Create Accounting.
+        Scope to this invoice and period. Resolve any holds if present.
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period:  [PERMITTED — no costing blockers]
+  -> Close GL period: BLOCKED — AP invoice AP-INV-B301 is NOT_ACCOUNTED.
+     GL cannot close until all subledger journals are accounted and transferred.
+  -> Outcome: BLOCKED — Run Create Accounting for AP-INV-B301 and transfer to GL.
+
+--------------------------------------------------------------------------------
+SCENARIO B-4
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : AP invoice accounted but NOT transferred to GL
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+AP TRANSACTIONS (Payables):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    AP-INV-B401 | Supplier: TEST-SUPPLIER-OMEGA | Period: Dec-24
+      Accounting: ACCOUNTED | Transfer: NOT_TRANSFERRED
+      Description: Subledger accounting journal exists but has not been
+                   posted to the General Ledger yet.
+      → ROOT CAUSE: The Transfer Journal Entries to GL process was not run
+        after Create Accounting completed, or the transfer encountered an error.
+      → NEXT STEP: Run Transfer Journal Entries to GL for invoice AP-INV-B401.
+        Navigate to: Payables > Accounting > Transfer Journal Entries to GL.
+        Confirm the journal appears in GL Unposted Journals after transfer.
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period:  [PERMITTED]
+  -> Close GL period: BLOCKED — AP-INV-B401 journal not yet transferred to GL.
+  -> Outcome: BLOCKED — Transfer AP-INV-B401 subledger journal to GL first.
+
+--------------------------------------------------------------------------------
+SCENARIO B-5
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : AR invoice NOT accounted
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean]
+
+AR TRANSACTIONS (Receivables):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    AR-INV-B501 | Customer: TEST-CUSTOMER-ALPHA | Period: Dec-24
+      Accounting: NOT_ACCOUNTED | Transfer: NOT_TRANSFERRED
+      Description: Revenue transaction completed; no accounting journal exists.
+      → ROOT CAUSE: Create Accounting was not run for this AR transaction,
+        or the transaction was in an invalid state when the process last ran.
+      → NEXT STEP: Run Create Accounting (Receivables) for AR-INV-B501.
+        Navigate to: Receivables > Accounting > Create Accounting.
+        Confirm journal is created, then run Transfer to GL.
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period:  [PERMITTED]
+  -> Close GL period: BLOCKED — AR-INV-B501 has NOT_ACCOUNTED status.
+  -> Outcome: BLOCKED — Run Create Accounting for AR-INV-B501 first.
+
+--------------------------------------------------------------------------------
+SCENARIO B-6
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : AR invoice accounted but NOT transferred to GL
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE]
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean]
+
+AR TRANSACTIONS (Receivables):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    AR-INV-B601 | Customer: TEST-CUSTOMER-ALPHA | Period: Dec-24
+      Accounting: ACCOUNTED | Transfer: NOT_TRANSFERRED
+      Description: AR subledger journal created but not yet posted to GL.
+      → ROOT CAUSE: Transfer Journal Entries to GL was not executed after
+        accounting, or the transfer job failed silently.
+      → NEXT STEP: Run Transfer Journal Entries to GL for AR-INV-B601.
+        Navigate to: Receivables > Accounting > Transfer Journal Entries to GL.
+        Verify the entry appears in GL Open Interface / Unposted Journals.
+
+INVENTORY TRANSACTIONS:
+  [NONE — Inventory is clean]
+
+CLOSE ACTIONS:
+  -> Close Costing period:  [PERMITTED]
+  -> Close GL period: BLOCKED — AR-INV-B601 not transferred to GL.
+  -> Outcome: BLOCKED — Transfer AR-INV-B601 journal to GL first.
+
+--------------------------------------------------------------------------------
+SCENARIO B-7
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : Inventory receipt NOT transferred to Cost Management
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE — PO receipt costing is clean]
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean]
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    INV-RCT-B701 | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100 | Period: Dec-24
+      Transfer to Cost Mgmt: NOT_TRANSFERRED | Costing: NOT_COSTED
+      Description: Inventory receipt approved but the cost processor has not
+                   picked up this transaction yet.
+      → ROOT CAUSE: The inventory transaction interface has not transferred
+        this receipt to Cost Management. This typically occurs when the
+        Transfer Transactions to Costing background process is delayed or
+        has encountered a processing error.
+      → NEXT STEP: Navigate to Inventory > Transactions > Transfer Transactions
+        to Costing. Submit the transfer process for Org TEST-ORG-M1 and period
+        Dec-24. Monitor the process completion and confirm the transaction
+        appears in Cost Management with a COSTED status before retrying close.
+
+CLOSE ACTIONS:
+  -> Close Costing period: BLOCKED — INV-RCT-B701 not transferred to Cost Mgmt.
+  -> Close GL period: BLOCKED — Costing period must close first.
+  -> Outcome: BLOCKED — Transfer inventory receipt to Cost Management first.
+
+--------------------------------------------------------------------------------
+SCENARIO B-8
+  Period      : Dec-24
+  Ledger ID   : 1001
+  Ledger Name : US Primary Ledger
+  Currency    : USD
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : Inventory receipt transferred to Cost Mgmt but NOT yet costed
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE — PO receipt costing is clean]
+
+AP TRANSACTIONS (Payables):
+  [NONE — AP is clean]
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    INV-RCT-B801 | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100 | Period: Dec-24
+      Transfer to Cost Mgmt: TRANSFERRED | Costing: NOT_COSTED
+      Description: Transaction is in Cost Management but the cost processor
+                   has not yet completed costing for this item.
+      → ROOT CAUSE: The Cost Accounting process has not yet processed this
+        transaction. This can occur if the item has no cost profile assigned,
+        the cost processor is backlogged, or a prior error paused the run.
+      → NEXT STEP: Navigate to Cost Management > Cost Accounting > Review
+        Cost Accounting Processes. Check for errors on transaction INV-RCT-B801.
+        Ensure item TEST-ITEM-XZ100 has a valid cost profile in Org TEST-ORG-M1.
+        Re-run the Cost Accounting process and confirm costing_status = COSTED.
+
+CLOSE ACTIONS:
+  -> Close Costing period: BLOCKED — INV-RCT-B801 costing_status = NOT_COSTED.
+  -> Close GL period: BLOCKED — Costing period must close first.
+  -> Outcome: BLOCKED — Complete costing for INV-RCT-B801 before retrying.
+
+--------------------------------------------------------------------------------
+SCENARIO B-9
+  Period      : Nov-24
+  Ledger ID   : 1002
+  Ledger Name : UK Primary Ledger
+  Currency    : GBP
+  GL Status   : Open
+  Cost Status : Open
+  CLOSE READY : NO
+  BLOCKED BY  : Multiple blockers — AP unaccounted + Inventory not costed
+--------------------------------------------------------------------------------
+
+COSTING TRANSACTIONS (blockers):
+  [NONE — PO receipt costing is clean]
+
+AP TRANSACTIONS (Payables):
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    AP-INV-B901 | Supplier: UK-VENDOR-DELTA | Period: Nov-24
+      Accounting: NOT_ACCOUNTED | Transfer: NOT_TRANSFERRED
+      Description: AP invoice for UK logistics services; accounting not created.
+      → NEXT STEP: Run Create Accounting for AP-INV-B901 in Payables.
+        Then run Transfer Journal Entries to GL.
+
+AR TRANSACTIONS (Receivables):
+  [NONE — AR is clean]
+
+INVENTORY TRANSACTIONS:
+  [1 BLOCKER FOUND]
+
+  Blocker Detail:
+    INV-RCT-B901 | Org: UK-PLANT-LON | Item: UK-ITEM-005 | Period: Nov-24
+      Transfer to Cost Mgmt: TRANSFERRED | Costing: NOT_COSTED
+      Description: Item in Cost Management queue but not yet costed.
+      → NEXT STEP: Run Cost Accounting process for UK-PLANT-LON.
+        Verify item UK-ITEM-005 has a cost profile assigned in the UK cost book.
+
+CLOSE ACTIONS:
+  -> Close Costing period: BLOCKED — INV-RCT-B901 costing_status = NOT_COSTED.
+  -> Close GL period: BLOCKED — Both Costing and AP blockers must be resolved.
+  -> Outcome: BLOCKED — 2 items require attention before period Nov-24 can close.
+     Priority 1: Cost item INV-RCT-B901 in Cost Management.
+     Priority 2: Account and transfer AP-INV-B901 to GL.
+
+================================================================================
+  QUICK REFERENCE: BLOCKER TYPE SUMMARY
+================================================================================
+
+  BLOCKER TYPE                        | MODULE             | BLOCKS WHICH CLOSE
+  ------------------------------------|--------------------|-----------------------
+  Costing ERROR (item cost missing)   | Cost Management    | Costing + GL
+  Costing ERROR (account rule fault)  | Cost Management    | Costing + GL
+  Inventory NOT transferred to Costing| Inventory          | Costing + GL
+  Inventory transferred NOT costed    | Cost Management    | Costing + GL
+  AP NOT_ACCOUNTED                    | Payables           | GL only
+  AP ACCOUNTED / NOT_TRANSFERRED      | Payables           | GL only
+  AR NOT_ACCOUNTED                    | Receivables        | GL only
+  AR ACCOUNTED / NOT_TRANSFERRED      | Receivables        | GL only
+
+================================================================================
+  END OF MOCK DATA FILE
+================================================================================

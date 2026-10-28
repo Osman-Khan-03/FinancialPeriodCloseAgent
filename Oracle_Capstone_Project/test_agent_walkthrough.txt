@@ -1,0 +1,382 @@
+================================================================================
+  FINANCIAL PERIOD CLOSE AGENT — MANUAL TEST WALKTHROUGH
+  Oracle Fusion Cloud — Period: Dec-24
+================================================================================
+
+PURPOSE
+-------
+This file is a step-by-step manual test guide for running the Financial Period
+Close Agent via app.py. Each test case maps to a numbered menu option, tells
+you exactly what input to enter, and documents the expected output so you can
+confirm the agent is behaving correctly.
+
+HOW TO START THE AGENT
+-----------------------
+  1. Open a terminal in the project directory.
+  2. Run:   python app.py
+  3. The main menu will appear. Follow the instructions for each test below.
+
+PERIOD USED IN ALL MOCK TESTS:  Dec-24
+
+================================================================================
+  TEST 1 — Multi-Ledger Errors (PO Receipt Costing + UK Account Rule Violation)
+  Menu Option: 1
+================================================================================
+
+DESCRIPTION
+-----------
+Simulates the default "real world" state where:
+  - Ledger 1001 (US) has a PO receipt with a missing item cost definition.
+  - Ledger 1002 (UK) has a receipt whose generated journal violates a dynamic
+    account combination rule.
+  - Ledger 1003 (Canada) is fully clean and should close successfully.
+
+STEPS
+-----
+  1. At the main menu, enter:  1
+  2. The agent runs automatically for period Dec-24.
+  3. No further input is required — observe the printed report.
+
+EXPECTED OUTPUT
+---------------
+Overall Status: BLOCKED
+
+  Ledger: US Primary Ledger
+    ID              : 1001
+    Costing Period  : Open
+    GL Period       : Open
+    Close Status    : BLOCKED
+    Reason          : Blocked by 1 pending or errored transactions.
+    Blockers Found:
+      - PO Receipt blocker found - PO: PO-2024-002, Receipt: RC-99012,
+        Item: CN-90812, Qty: 50 Box.
+        Cost Status: ERROR, Accounting Status: NOT_ACCOUNTED.
+        Reason: Item cost definition is missing for item 'CN-90812' in US Cost Book.
+
+  Ledger: UK Primary Ledger
+    ID              : 1002
+    Costing Period  : Open
+    GL Period       : Open
+    Close Status    : BLOCKED
+    Reason          : Blocked by 1 pending or errored transactions.
+    Blockers Found:
+      - PO Receipt blocker found - PO: PO-2024-003, Receipt: RC-99013,
+        Item: AS54888, Qty: 10 Ea.
+        Cost Status: COSTED, Accounting Status: ERROR.
+        Reason: Subledger Journal Entry violates dynamic account combination
+                rule 'UK_ACC_RULE'.
+
+  Ledger: Canada Primary Ledger
+    ID              : 1003
+    Costing Period  : Closed
+    GL Period       : Closed
+    Close Status    : SUCCESS
+    Reason          : Successfully closed all periods.
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+Final Banner: ⚠️  HOLD — Financial Close is blocked. Resolve highlighted issues.
+
+WHAT THE AGENT IS DEMONSTRATING
+---------------------------------
+  - It correctly identifies item-cost-definition errors in Costing.
+  - It correctly identifies subledger accounting rule violations.
+  - It closes the one clean ledger (Canada) and blocks the other two.
+  - It reports each blocker with full PO, Receipt, Item, and error details.
+
+CORRECTIVE ACTIONS (what a user would do before retrying)
+----------------------------------------------------------
+  For Ledger 1001 (US):
+    1. Navigate to: Cost Management > Manage Item Costs.
+    2. Define cost profile and standard cost for item CN-90812 in US Cost Book.
+    3. Re-run the cost processor for Receipt RC-99012.
+
+  For Ledger 1002 (UK):
+    1. Navigate to: Manage Subledger Accounting Options.
+    2. Correct the account segment or mapping for item AS54888 / UK cost org
+       to satisfy rule UK_ACC_RULE.
+    3. Re-run Create Accounting for Receipt RC-99013.
+
+================================================================================
+  TEST 2 — Single PO Receipt Costing Error (US Only)
+  Menu Option: 2
+================================================================================
+
+DESCRIPTION
+-----------
+Simulates a state where only Ledger 1001 (US) has a costing blocker.
+Ledger 1002 (UK) has been cleared of its accounting rule error.
+Ledger 1003 (Canada) is clean.
+
+STEPS
+-----
+  1. At the main menu, enter:  2
+  2. The agent runs automatically. No further input required.
+
+EXPECTED OUTPUT
+---------------
+Overall Status: BLOCKED
+
+  Ledger: US Primary Ledger
+    Close Status    : BLOCKED
+    Reason          : Blocked by 1 pending or errored transactions.
+    Blockers Found:
+      - PO Receipt blocker found - PO: PO-2024-002, Receipt: RC-99012,
+        Item: CN-90812, Qty: 50 Box.
+        Cost Status: ERROR, Accounting Status: NOT_ACCOUNTED.
+        Reason: Item cost definition is missing for item 'CN-90812' in US Cost Book.
+
+  Ledger: UK Primary Ledger
+    Close Status    : SUCCESS
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+  Ledger: Canada Primary Ledger
+    Close Status    : SUCCESS
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+Final Banner: ⚠️  HOLD — Financial Close is blocked.
+
+WHAT THE AGENT IS DEMONSTRATING
+---------------------------------
+  - It isolates the single remaining costing error to Ledger 1001.
+  - UK and Canada close successfully, proving the agent processes each
+    ledger independently.
+
+================================================================================
+  TEST 3 — UK Subledger Account Rule Violation Only
+  Menu Option: 3
+================================================================================
+
+DESCRIPTION
+-----------
+Simulates a state where only Ledger 1002 (UK) has an accounting error.
+Ledger 1001 (US) has been cleared of its item cost definition error.
+Ledger 1003 (Canada) is clean.
+
+STEPS
+-----
+  1. At the main menu, enter:  3
+  2. The agent runs automatically. No further input required.
+
+EXPECTED OUTPUT
+---------------
+Overall Status: BLOCKED
+
+  Ledger: US Primary Ledger
+    Close Status    : SUCCESS
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+  Ledger: UK Primary Ledger
+    Close Status    : BLOCKED
+    Reason          : Blocked by 1 pending or errored transactions.
+    Blockers Found:
+      - PO Receipt blocker found - PO: PO-2024-003, Receipt: RC-99013,
+        Item: AS54888, Qty: 10 Ea.
+        Cost Status: COSTED, Accounting Status: ERROR.
+        Reason: Subledger Journal Entry violates dynamic account combination
+                rule 'UK_ACC_RULE'.
+
+  Ledger: Canada Primary Ledger
+    Close Status    : SUCCESS
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+Final Banner: ⚠️  HOLD — Financial Close is blocked.
+
+WHAT THE AGENT IS DEMONSTRATING
+---------------------------------
+  - US (now clear) closes successfully.
+  - UK's subledger accounting rule error is the sole remaining blocker.
+  - The agent correctly distinguishes a "COSTED but NOT ACCOUNTED" state
+    (cost calculation succeeded; journal creation failed).
+
+================================================================================
+  TEST 4 — All Clear (Successful Full Close)
+  Menu Option: 4
+================================================================================
+
+DESCRIPTION
+-----------
+Simulates the fully resolved state where all costing errors have been fixed
+across all three ledgers. Every period should close cleanly.
+
+STEPS
+-----
+  1. At the main menu, enter:  4
+  2. The agent runs automatically. No further input required.
+
+EXPECTED OUTPUT
+---------------
+Overall Status: COMPLETED
+
+  Ledger: US Primary Ledger
+    Costing Period  : Closed
+    GL Period       : Closed
+    Close Status    : SUCCESS
+    Reason          : Successfully closed all periods.
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+  Ledger: UK Primary Ledger
+    Costing Period  : Closed
+    GL Period       : Closed
+    Close Status    : SUCCESS
+    Reason          : Successfully closed all periods.
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+  Ledger: Canada Primary Ledger
+    Costing Period  : Closed
+    GL Period       : Closed
+    Close Status    : SUCCESS
+    Reason          : Successfully closed all periods.
+    Actions Taken:
+      ✓ Closed Costing period.
+      ✓ Closed General Ledger period.
+
+Final Banner: 🎉 SUCCESS — All Oracle Fusion Financial and Costing periods
+                            have been successfully validated and closed!
+
+WHAT THE AGENT IS DEMONSTRATING
+---------------------------------
+  - The happy path: a fully clean state closes all three ledgers in one run.
+  - Costing is always closed before GL (correct sequencing enforced).
+  - The overall status is COMPLETED only when every ledger succeeds.
+
+================================================================================
+  TEST 5 — Automated Unit Test Suite
+  Menu Option: 6
+================================================================================
+
+DESCRIPTION
+-----------
+Runs the full automated Python unit test suite (test_period_close_8_case_pack.py
+and test_purchase_order_receipt.py). This validates all 8 period-close cases:
+
+  Case 1: AP invoice — NOT_ACCOUNTED                (flagged)
+  Case 2: AP invoice — ACCOUNTED / NOT_TRANSFERRED  (flagged)
+  Case 3: AR invoice — NOT_ACCOUNTED                (flagged)
+  Case 4: AR invoice — ACCOUNTED / NOT_TRANSFERRED  (flagged)
+  Case 5: Inventory  — NOT transferred to Cost Mgmt (flagged)
+  Case 6: Inventory  — transferred but NOT_COSTED   (flagged)
+  Case 7: AP invoice — fully processed              (NOT flagged — negative ctrl)
+  Case 8: AR invoice — fully processed              (NOT flagged — negative ctrl)
+
+STEPS
+-----
+  1. At the main menu, enter:  6
+  2. The test runner executes automatically.
+  3. Watch for PASS / FAIL per test method.
+
+EXPECTED OUTPUT (summary)
+--------------------------
+  Ran XX tests in X.XXXs
+  OK
+
+  All individual test methods should show:  ... ok
+  No failures or errors should appear.
+
+  Key log lines to look for:
+    CASE 1 result – record_id=TEST-AP-INV-001 ... >>> CASE 1 PASSED
+    CASE 2 result – record_id=TEST-AP-INV-002 ... >>> CASE 2 PASSED
+    CASE 3 result – record_id=TEST-AR-INV-003 ... >>> CASE 3 PASSED
+    CASE 4 result – record_id=TEST-AR-INV-004 ... >>> CASE 4 PASSED
+    CASE 5 result – record_id=TEST-INV-RCT-005 ... >>> CASE 5 PASSED
+    CASE 6 result – record_id=TEST-INV-RCT-006 ... >>> CASE 6 PASSED
+    CASE 7 result – TEST-AP-INV-007 correctly absent >>> CASE 7 PASSED
+    CASE 8 result – TEST-AR-INV-008 correctly absent >>> CASE 8 PASSED
+    >>> TEST PACK COMPLETED SUCCESSFULLY
+
+  Final aggregate check:
+    AP  flagged : 2  (Cases 1, 2)
+    AR  flagged : 2  (Cases 3, 4)
+    INV flagged : 2  (Cases 5, 6)
+    Total flagged / 8 records : 6 / 8  (expected 6/8 = 75%)
+
+================================================================================
+  TEST 6 — Live Oracle Fusion ERP Connection
+  Menu Option: 5
+================================================================================
+
+DESCRIPTION
+-----------
+Connects to a real Oracle Fusion Cloud instance using stored API credentials.
+Run Option 7 (Configure Credentials) BEFORE this test.
+
+PRE-REQUISITES
+--------------
+  1. You must have a valid Oracle Fusion Cloud host URL, username, and
+     password / API token with at minimum these REST API permissions:
+       - GET  fscmRestApp/resources/.../ledgers
+       - GET  fscmRestApp/resources/.../ledgerPeriods
+       - GET  fscmRestApp/resources/.../costTransactions
+       - POST fscmRestApp/resources/.../ledgerPeriods  (for close action)
+  2. Run Option 7 first to save credentials to config.json.
+
+STEPS
+-----
+  Step A — Configure credentials (one-time setup):
+    1. At the main menu, enter:  7
+    2. Enter Oracle Fusion Host URL (e.g., https://your-instance.oraclecloud.com)
+    3. Enter Username (e.g., scm_close_agent)
+    4. Enter Password / API Token
+    5. Credentials are saved to config.json (never committed to source control).
+
+  Step B — Run live agent:
+    1. At the main menu, enter:  5
+    2. When prompted: "Enter Oracle Period Name (e.g., Dec-24)"
+       Enter the period you want to close (e.g., Jan-25, Feb-25, Dec-24).
+    3. The agent connects, fetches live ledger data, and reports results.
+
+EXPECTED OUTPUT (live — varies by environment state)
+-----------------------------------------------------
+  If ledgers are clean:
+    Overall Status: COMPLETED
+    All ledgers show Close Status: SUCCESS with Costing and GL Closed.
+
+  If blockers exist:
+    Overall Status: BLOCKED
+    Each blocked ledger will list its specific blocker transactions
+    with PO number, receipt, item, error, and next-step guidance.
+
+  If credentials are wrong:
+    [ERROR] Oracle Fusion API Error 401: Unauthorized
+    or
+    [ERROR] Connection to Oracle Fusion failed: ...
+
+IMPORTANT NOTES FOR LIVE TESTING
+----------------------------------
+  - Obtain sign-off from the Oracle environment owner before closing
+    any period in a shared Dev or UAT environment.
+  - Use a dedicated test ledger and period where possible.
+  - The close action (POST) is irreversible — a Closed period cannot
+    be reopened without a manual GL period status update.
+  - Do NOT run this against Production without explicit change-management
+    approval and a tested rollback procedure.
+
+================================================================================
+  PASS / FAIL CRITERIA SUMMARY
+================================================================================
+
+  Test | Menu | Pass Condition
+  -----|------|----------------------------------------------------------------
+  1    |  1   | Overall: BLOCKED; US+UK: BLOCKED; Canada: SUCCESS
+  2    |  2   | Overall: BLOCKED; US: BLOCKED; UK+Canada: SUCCESS
+  3    |  3   | Overall: BLOCKED; UK: BLOCKED; US+Canada: SUCCESS
+  4    |  4   | Overall: COMPLETED; All 3 ledgers: SUCCESS with Closed statuses
+  5    |  6   | All unit tests: OK; 6 flagged / 8 records; 0 failures
+  6    |  5   | Varies by live environment — see section above
+
+================================================================================
+  END OF TEST WALKTHROUGH FILE
+================================================================================
