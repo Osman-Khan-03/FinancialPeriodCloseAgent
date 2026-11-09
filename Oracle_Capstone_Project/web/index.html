@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle Financial Period Close Agent | IBM Consulting Advantage</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app" class="app-container">
+        <!-- TOP APP HEADER -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="ibm-logo-badge">
+                    <span class="ibm-text">IBM</span>
+                    <span class="consulting-text">Consulting Advantage</span>
+                </div>
+                <div class="divider-vertical"></div>
+                <div class="header-title-group">
+                    <h1 class="header-title">Oracle Financial Period Close Agent</h1>
+                    <span class="header-subtitle">Autonomous ERP Financials & SCM Costing Orchestrator</span>
+                </div>
+            </div>
+
+            <div class="header-center">
+                <div class="period-control-pill">
+                    <span class="pill-label">Accounting Period:</span>
+                    <select id="period-selector" class="period-select" title="Select Accounting Period">
+                        <option value="Dec-24" selected>Dec-24 (Active / Hold Test)</option>
+                        <option value="Nov-24">Nov-24 (Multi-Ledger Clean)</option>
+                        <option value="Oct-24">Oct-24 (Single Clean Ledger)</option>
+                        <option value="Jan-25">Jan-25 (Next Period)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div class="connection-status-pill" id="connection-pill">
+                    <span class="status-dot simulation"></span>
+                    <span class="status-mode-label" id="connection-mode-text">MOCK SIMULATION</span>
+                </div>
+                <div class="scenario-selector-wrapper">
+                    <select id="scenario-selector" class="scenario-select" title="Active Simulation Scenario">
+                        <option value="default">Scenario 1: Multi-Ledger Errors (US+UK)</option>
+                        <option value="po_costing_hold_only">Scenario 2: Single PO Costing Error (US Only)</option>
+                        <option value="unaccounted_hold_only">Scenario 3: UK SLA Rule Violation Only</option>
+                        <option value="all_clear">Scenario 4: All Clear (Full Success)</option>
+                    </select>
+                </div>
+                <button id="btn-refresh-state" class="btn-icon" title="Refresh State">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN NAVIGATION TABS -->
+        <nav class="app-navigation">
+            <button class="nav-tab active" data-tab="tab-chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Agent Chat (Consulting Advantage)</span>
+            </button>
+            <button class="nav-tab" data-tab="tab-dashboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="9"/>
+                    <rect x="14" y="3" width="7" height="5"/>
+                    <rect x="14" y="12" width="7" height="9"/>
+                    <rect x="3" y="16" width="7" height="5"/>
+                </svg>
+                <span>Period Close Cockpit</span>
+                <span class="badge-tab-indicator" id="nav-blocked-badge" style="display:none">HOLD</span>
+            </button>
+            <button class="nav-tab" data-tab="tab-blockers">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span>Blocker Resolution Hub</span>
+                <span class="badge-count" id="blocker-count-badge">0</span>
+            </button>
+            <button class="nav-tab" data-tab="tab-testing">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <path d="M9 13l2 2 4-4"/>
+                </svg>
+                <span>8-Case Test Pack & Suite</span>
+            </button>
+            <button class="nav-tab" data-tab="tab-config">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Oracle Fusion Connection</span>
+            </button>
+        </nav>
+
+        <!-- MAIN BODY CONTENT AREA -->
+        <main class="app-main-content">
+            <!-- TAB 1: AGENT CHAT (IBM CONSULTING ADVANTAGE) -->
+            <section id="tab-chat" class="tab-panel active">
+                <div class="chat-layout">
+                    <!-- CHAT SIDEBAR (TEMPLATES & PROMPTS) -->
+                    <aside class="chat-sidebar">
+                        <div class="sidebar-section-title">
+                            <span class="icon">⚡</span>
+                            <span>Consulting Advantage Prompts</span>
+                        </div>
+                        <p class="sidebar-help-text">
+                            Select a scenario template to load pre-configured agent prompts from <code>agent_prompt_inputs.txt</code>:
+                        </p>
+
+                        <div class="prompt-templates-list" id="prompt-templates-list">
+                            <!-- Template items injected by JavaScript -->
+                        </div>
+
+                        <div class="sidebar-divider"></div>
+
+                        <div class="sidebar-section-title">
+                            <span class="icon">🎯</span>
+                            <span>Quick Actions</span>
+                        </div>
+                        <div class="quick-action-buttons">
+                            <button class="btn-quick-chip" data-quick="Readiness Check for Dec-24 across all ledgers">
+                                🔍 Full Readiness Check (Dec-24)
+                            </button>
+                            <button class="btn-quick-chip" data-quick="Close Request for US Primary Ledger (1001) in Oct-24">
+                                🚀 Close Request (Oct-24 US)
+                            </button>
+                            <button class="btn-quick-chip" data-quick="Status Inquiry for period Dec-24">
+                                📊 Status Inquiry (Dec-24)
+                            </button>
+                            <button class="btn-quick-chip" data-quick="Are there any purchase order receipt costing errors in US Primary Ledger?">
+                                📦 Check PO Receipt Errors
+                            </button>
+                        </div>
+                    </aside>
+
+                    <!-- CHAT CONVERSATION CONTAINER -->
+                    <div class="chat-main-container">
+                        <div class="chat-conversation-header">
+                            <div class="chat-agent-info">
+                                <div class="agent-avatar">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                                        <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
+                                        <rect x="4" y="8" width="16" height="12" rx="2"/>
+                                        <line x1="9" y1="13" x2="9.01" y2="13"/>
+                                        <line x1="15" y1="13" x2="15.01" y2="13"/>
+                                        <line x1="8" y1="17" x2="16" y2="17"/>
+                                    </svg>
+                                </div>
+                                <div class="agent-meta">
+                                    <span class="agent-name">Oracle Financial Period Close Agent</span>
+                                    <span class="agent-role">IBM Consulting Advantage • Orchestration Engine</span>
+                                </div>
+                            </div>
+                            <div class="chat-header-actions">
+                                <button id="btn-clear-chat" class="btn-secondary-sm" title="Clear Chat History">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CHAT MESSAGES SCROLL AREA -->
+                        <div class="chat-messages-scroll" id="chat-messages">
+                            <!-- Welcome / Greeting message -->
+                            <div class="chat-message agent-message">
+                                <div class="message-avatar">
+                                    <div class="avatar-circle">IBM</div>
+                                </div>
+                                <div class="message-content-wrapper">
+                                    <div class="message-author">IBM Consulting Advantage Agent</div>
+                                    <div class="message-body">
+                                        <p>👋 Hello! I am your <strong>Oracle Financial Period Close Agent</strong>.</p>
+                                        <p>I monitor and orchestrate period close readiness across Oracle Fusion Cloud Financials and Supply Chain Management (SCM Costing, SLA, Payables, Receivables, and Inventory).</p>
+                                        <div class="message-callout">
+                                            <strong>How I can help you today:</strong>
+                                            <ul>
+                                                <li><strong>Readiness Check:</strong> Deep multi-module scan for blocking transactions (PO costing, SLA rules, unaccounted invoices).</li>
+                                                <li><strong>Close Request:</strong> Autonomous pre-close validation and sequenced period closure (Costing first, then General Ledger).</li>
+                                                <li><strong>Status Inquiry:</strong> Real-time inspection of open/closed statuses across active ledgers.</li>
+                                            </ul>
+                                        </div>
+                                        <p>Select any prompt template on the left or type your instructions below to begin.</p>
+                                    </div>
+                                    <div class="message-timestamp">Ready</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CHAT INPUT COMPOSER -->
+                        <div class="chat-composer-container">
+                            <form id="chat-form" class="chat-form">
+                                <div class="textarea-wrapper">
+                                    <textarea id="chat-input" placeholder="Type instructions or paste an IBM Consulting Advantage prompt (e.g. 'Run readiness check for Dec-24')..." rows="3"></textarea>
+                                </div>
+                                <div class="composer-toolbar">
+                                    <div class="composer-hints">
+                                        <span>Tip: Press <code>Enter</code> to send, <code>Shift+Enter</code> for new line</span>
+                                    </div>
+                                    <div class="composer-actions">
+                                        <button type="submit" id="btn-send-chat" class="btn-primary">
+                                            <span>Send Prompt</span>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="22" y1="2" x2="11" y2="13"/>
+                                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: PERIOD CLOSE COCKPIT / DASHBOARD -->
+            <section id="tab-dashboard" class="tab-panel">
+                <div class="dashboard-container">
+                    <!-- KPI SUMMARY STATS -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Ledgers Monitored</span>
+                                <span class="kpi-icon blue">🏛️</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-total-ledgers">3</div>
+                            <div class="kpi-footer">US, UK, and Canada Primary</div>
+                        </div>
+
+                        <div class="kpi-card" id="kpi-card-status">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Close Readiness</span>
+                                <span class="kpi-icon warning" id="kpi-status-icon">⚠️</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-readiness-state">HOLD</div>
+                            <div class="kpi-footer" id="kpi-readiness-desc">Costing & SLA blockers detected</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Active Blockers</span>
+                                <span class="kpi-icon red">🚨</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-blocker-count">2</div>
+                            <div class="kpi-footer" id="kpi-blocker-sub">Transactions requiring resolution</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Module Coverage</span>
+                                <span class="kpi-icon green">🛡️</span>
+                            </div>
+                            <div class="kpi-value">5 / 5</div>
+                            <div class="kpi-footer">Costing • SLA • AP • AR • Inv</div>
+                        </div>
+                    </div>
+
+                    <!-- ORCHESTRATION ACTIONS BAR -->
+                    <div class="orchestration-bar">
+                        <div class="orchestration-info">
+                            <h3>Period Close Orchestrator</h3>
+                            <p>Target Period: <strong id="orch-period-text">Dec-24</strong> | Target Scope: <strong>All Active Primary Ledgers</strong></p>
+                        </div>
+                        <div class="orchestration-actions">
+                            <button id="btn-run-assessment" class="btn-secondary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                <span>Run Readiness Assessment</span>
+                            </button>
+                            <button id="btn-execute-close" class="btn-primary-danger">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                </svg>
+                                <span>Execute Financial Period Close</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LEDGER STATUS CARDS GRID -->
+                    <div class="section-title-bar">
+                        <h2>Active Ledgers & Period Statuses</h2>
+                        <span class="subtitle">Autonomous validation across Cost Management and General Ledger</span>
+                    </div>
+
+                    <div class="ledger-cards-grid" id="ledger-cards-container">
+                        <!-- Cards dynamically rendered by app.js -->
+                    </div>
+
+                    <!-- MODULE READINESS BREAKDOWN MATRIX -->
+                    <div class="module-matrix-card">
+                        <div class="matrix-header">
+                            <h3>Subledger Readiness Matrix</h3>
+                            <span class="matrix-badge">Period: <span id="matrix-period-label">Dec-24</span></span>
+                        </div>
+                        <div class="matrix-table-wrapper">
+                            <table class="data-table" id="module-matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ledger</th>
+                                        <th>Costing (PO Receipts)</th>
+                                        <th>Subledger SLA</th>
+                                        <th>Payables (AP)</th>
+                                        <th>Receivables (AR)</th>
+                                        <th>Inventory</th>
+                                        <th>Readiness</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="module-matrix-tbody">
+                                    <!-- Injected by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: BLOCKER RESOLUTION HUB -->
+            <section id="tab-blockers" class="tab-panel">
+                <div class="blocker-hub-container">
+                    <div class="hub-header">
+                        <div>
+                            <h2>Subledger Blocker & Root-Cause Resolution Hub</h2>
+                            <p>Inspect blocking transactions preventing period close with step-by-step resolution playbooks.</p>
+                        </div>
+                        <div class="hub-filters">
+                            <input type="text" id="blocker-search-input" class="search-input" placeholder="Search PO #, Item, Supplier, Error...">
+                            <select id="blocker-module-filter" class="filter-select">
+                                <option value="ALL">All Modules</option>
+                                <option value="costing">Cost Management</option>
+                                <option value="sla">Subledger Accounting</option>
+                                <option value="ap">Payables (AP)</option>
+                                <option value="ar">Receivables (AR)</option>
+                                <option value="inventory">Inventory</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="blocker-table-card">
+                        <div class="table-responsive">
+                            <table class="data-table" id="blockers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Severity</th>
+                                        <th>Module</th>
+                                        <th>Identifier / Ref</th>
+                                        <th>Ledger</th>
+                                        <th>Item / Supplier / Details</th>
+                                        <th>Root Cause Error</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blockers-tbody">
+                                    <!-- Injected by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-blockers-message" class="empty-state" style="display:none;">
+                            <div class="empty-icon">🎉</div>
+                            <h3>No Active Blockers Found</h3>
+                            <p>All subledger distributions and accounting entries are fully processed for the active period.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: 8-CASE TEST PACK & AUTOMATED TESTING -->
+            <section id="tab-testing" class="tab-panel">
+                <div class="testing-container">
+                    <div class="testing-header">
+                        <div>
+                            <h2>Oracle Financial Period Close Test Suite</h2>
+                            <p>Autonomous test verification covering the 8-case synthetic period close pack and single PO costing test.</p>
+                        </div>
+                        <div class="test-actions">
+                            <button id="btn-run-test-pack" class="btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <span>Execute 8-Case Test Pack</span>
+                            </button>
+                            <button id="btn-run-unit-tests" class="btn-secondary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="4 17 10 11 4 5"/>
+                                    <line x1="12" y1="19" x2="20" y2="19"/>
+                                </svg>
+                                <span>Run Python Unittest Suite</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 8-CASE TEST PACK MATRIX -->
+                    <div class="test-pack-card">
+                        <div class="card-header-flex">
+                            <h3>8-Case Synthetic Period-Close Test Pack Matrix</h3>
+                            <div class="test-pack-stats" id="test-pack-stats-banner">
+                                <span class="badge-neutral">6 Expected Positive (75%)</span>
+                                <span class="badge-neutral">2 Negative Controls (25%)</span>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Case #</th>
+                                        <th>Synthetic Record ID</th>
+                                        <th>Target Module</th>
+                                        <th>Condition Under Test</th>
+                                        <th>Expected Outcome</th>
+                                        <th>Verification Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="test-pack-tbody">
+                                    <tr>
+                                        <td><strong>Case 1</strong></td>
+                                        <td><code>TEST-AP-INV-001</code></td>
+                                        <td>Payables (AP)</td>
+                                        <td>Unaccounted invoice (accounting not created)</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-1-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 2</strong></td>
+                                        <td><code>TEST-AP-INV-002</code></td>
+                                        <td>Payables (AP)</td>
+                                        <td>Accounted, not transferred to GL</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-2-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 3</strong></td>
+                                        <td><code>TEST-AR-INV-003</code></td>
+                                        <td>Receivables (AR)</td>
+                                        <td>Unaccounted invoice (accounting not created)</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-3-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 4</strong></td>
+                                        <td><code>TEST-AR-INV-004</code></td>
+                                        <td>Receivables (AR)</td>
+                                        <td>Accounted, not transferred to GL</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-4-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 5</strong></td>
+                                        <td><code>TEST-INV-RCT-005</code></td>
+                                        <td>Inventory / Cost Mgmt</td>
+                                        <td>Receipt approved, NOT transferred to Cost Management</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-5-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 6</strong></td>
+                                        <td><code>TEST-INV-RCT-006</code></td>
+                                        <td>Inventory / Cost Mgmt</td>
+                                        <td>Transferred to Cost Mgmt, NOT yet costed</td>
+                                        <td><span class="badge-warning">FLAGGED</span></td>
+                                        <td id="test-case-6-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 7</strong></td>
+                                        <td><code>TEST-AP-INV-007</code></td>
+                                        <td>Payables (Negative Control)</td>
+                                        <td>Fully accounted and transferred to GL</td>
+                                        <td><span class="badge-success">NOT FLAGGED</span></td>
+                                        <td id="test-case-7-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Case 8</strong></td>
+                                        <td><code>TEST-AR-INV-008</code></td>
+                                        <td>Receivables (Negative Control)</td>
+                                        <td>Fully accounted and transferred to GL</td>
+                                        <td><span class="badge-success">NOT FLAGGED</span></td>
+                                        <td id="test-case-8-status"><span class="status-pill pending">Ready to Run</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TEST EXECUTION TERMINAL / LOG VIEW -->
+                    <div class="terminal-card">
+                        <div class="terminal-header">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">Test Runner Console Output</span>
+                        </div>
+                        <pre class="terminal-body" id="test-terminal-output">Press "Execute 8-Case Test Pack" or "Run Python Unittest Suite" above to view live execution logs.</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: ORACLE FUSION CONFIGURATION -->
+            <section id="tab-config" class="tab-panel">
+                <div class="config-container">
+                    <div class="config-card">
+                        <h2>Oracle Fusion Cloud REST API Configuration</h2>
+                        <p class="config-desc">
+                            Connect the Financial Period Close Agent directly to your Oracle Fusion Cloud ERP instance (Dev, UAT, or Production) using standard ERP REST endpoints.
+                        </p>
+
+                        <form id="config-form" class="config-form">
+                            <div class="form-group">
+                                <label for="cfg-mode">Execution Mode</label>
+                                <select id="cfg-mode" class="form-control">
+                                    <option value="MOCK">Simulation Mode (Mock Local Client)</option>
+                                    <option value="REAL">Live Oracle Fusion Cloud REST API</option>
+                                </select>
+                                <small class="form-help">Use Simulation Mode for testing scenarios and demonstrations without ERP credentials.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="cfg-url">Oracle Fusion Cloud Host URL</label>
+                                <input type="text" id="cfg-url" class="form-control" placeholder="https://your-fusion-instance.oraclecloud.com">
+                                <small class="form-help">Example: <code>https://fa-eaab-dev7-saasfademo1.ds-fa.oraclepdemos.com</code></small>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group half">
+                                    <label for="cfg-username">API Username / Service Account</label>
+                                    <input type="text" id="cfg-username" class="form-control" placeholder="scm_close_agent">
+                                </div>
+                                <div class="form-group half">
+                                    <label for="cfg-password">Password / API Token</label>
+                                    <input type="password" id="cfg-password" class="form-control" placeholder="••••••••••••••••">
+                                </div>
+                            </div>
+
+                            <div class="config-actions">
+                                <button type="button" id="btn-test-connection" class="btn-secondary">
+                                    <span>Test REST API Connection</span>
+                                </button>
+                                <button type="submit" class="btn-primary">
+                                    <span>Save Configuration</span>
+                                </button>
+                            </div>
+
+                            <div id="config-status-alert" class="alert-box" style="display:none;"></div>
+                        </form>
+                    </div>
+
+                    <!-- SECURITY & COMPLIANCE NOTICE -->
+                    <div class="security-card">
+                        <h3>🔒 Enterprise Security & Policy Enforcement</h3>
+                        <ul>
+                            <li><strong>Localhost Binding:</strong> The agent service is strictly bound to <code>127.0.0.1</code> in full compliance with IBM security policies.</li>
+                            <li><strong>Encrypted Transport:</strong> Live Oracle Fusion requests utilize TLS 1.2+ HTTPS with strict certificate validation.</li>
+                            <li><strong>Subledger Integrity:</strong> Costing periods are strictly verified and closed prior to General Ledger closure to maintain ERP accounting consistency.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- RESOLUTION DETAIL MODAL -->
+        <div id="resolution-modal" class="modal-backdrop" style="display:none;">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 id="modal-title">Blocker Resolution Detail</h3>
+                    <button class="btn-modal-close" id="btn-close-modal">&times;</button>
+                </div>
+                <div class="modal-body" id="modal-body-content">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="btn-modal-dismiss">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXECUTE CLOSE CONFIRMATION MODAL -->
+        <div id="close-confirm-modal" class="modal-backdrop" style="display:none;">
+            <div class="modal-dialog">
+                <div class="modal-header warning">
+                    <h3>⚠️ Confirm Financial Period Close Execution</h3>
+                    <button class="btn-modal-close" id="btn-close-confirm-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to initiate autonomous period closure for:</p>
+                    <div class="confirm-summary-box">
+                        <p><strong>Accounting Period:</strong> <span id="confirm-period-text">Dec-24</span></p>
+                        <p><strong>Scope:</strong> All Active Ledgers</p>
+                        <p><strong>Sequence:</strong> SCM Costing Period &rarr; ERP General Ledger</p>
+                    </div>
+                    <p class="warning-text">
+                        <strong>Important:</strong> The agent will automatically verify all subledgers before closing. If any blockers are found, close execution will be safely blocked.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="btn-cancel-close">Cancel</button>
+                    <button class="btn-primary-danger" id="btn-confirm-execute-close">Proceed with Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP JAVASCRIPT -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -83,10 +83,11 @@ def main_menu():
         print("5. [REAL] Connect to live Oracle Fusion ERP and Run Close Agent")
         print("6. [TEST] Run Automated Test Suite (Single PO Receipt Costing Test)")
         print("7. Configure Oracle Fusion API Credentials")
-        print("8. Exit")
+        print("8. [WEB UI] Launch Web Interface (IBM Consulting Advantage Cockpit & Chat)")
+        print("9. Exit")
         print("#"*60)
         
-        choice = input("Enter your selection (1-8): ").strip()
+        choice = input("Enter your selection (1-9): ").strip()
         
         if choice == "1":
             print("\n[info] Initiating Close Agent under Multi-Ledger Errors simulation...")
@@ -138,14 +139,24 @@ def main_menu():
             save_config(config)
             
         elif choice == "8":
+            print("\n[info] Launching Web Interface on http://127.0.0.1:8000 ...")
+            from server import start_server
+            start_server("127.0.0.1", 8000)
+            
+        elif choice == "9":
             print("\nExiting Oracle Fusion Period Close Agent. Goodbye!")
             sys.exit(0)
         else:
-            print("\n[!] Invalid selection. Please enter a number from 1 to 8.")
+            print("\n[!] Invalid selection. Please enter a number from 1 to 9.")
 
 if __name__ == "__main__":
-    try:
-        main_menu()
-    except KeyboardInterrupt:
-        print("\n\nProcess interrupted by user. Exiting.")
-        sys.exit(0)
+    if "--ui" in sys.argv or "--web" in sys.argv or "--server" in sys.argv:
+        from server import start_server
+        port = int(os.environ.get("PORT", 8000))
+        start_server("127.0.0.1", port)
+    else:
+        try:
+            main_menu()
+        except KeyboardInterrupt:
+            print("\n\nProcess interrupted by user. Exiting.")
+            sys.exit(0)

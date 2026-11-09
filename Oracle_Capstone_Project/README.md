@@ -50,10 +50,48 @@ The agent ensures that all subledgers—specifically **Cost Management (Costing)
 
 ---
 
-## 💻 How to Run the Agent
+## 🌐 Modern Web User Interface (IBM Consulting Advantage Cockpit)
+
+A rich, enterprise-grade Web UI is built-in for interacting with the Period Close Agent. It features an interactive **IBM Consulting Advantage AI Chat**, **Period Close Cockpit / Dashboard**, **Blocker Resolution Hub**, **8-Case Test Pack Matrix Runner**, and **Oracle Fusion REST API Configuration**.
+
+### Launching the Web UI:
+Run either of the following commands:
+```bash
+python server.py
+```
+or
+```bash
+python app.py --ui
+```
+
+Then open your browser at **`http://127.0.0.1:8000/`**.
+
+### Web UI Features:
+1. **💬 Agent Chat (IBM Consulting Advantage)**:
+   - Full conversational interface supporting natural language or structured prompt inputs from `agent_prompt_inputs.txt`.
+   - 1-Click Prompt Templates drawer for all 9 standard test scenarios (Oct-24 clean, Nov-24 global clean, PO receipt costing errors, SLA rule violations, AP/AR unaccounted, Inventory transfer holds).
+   - Rich markdown formatting with status badges, blocker cards, and step-by-step resolution playbooks.
+2. **📊 Period Close Cockpit / Dashboard**:
+   - High-level KPIs (Ledgers Monitored, Readiness State, Active Blockers, Subledger Coverage).
+   - Real-time Ledger Cards (US Primary Ledger, UK Primary Ledger, Canada Primary Ledger) displaying GL and Costing period statuses.
+   - Subledger Readiness Matrix (Cost Management, SLA, AP, AR, Inventory).
+   - Interactive **Run Readiness Assessment** and **Execute Period Close** buttons.
+3. **🔍 Blocker Resolution Hub**:
+   - Searchable and filterable table of all blocking transactions across all ledgers and modules.
+   - Detailed inspection modal with root cause explanation and exact corrective actions.
+4. **🧪 8-Case Test Pack & Test Suite**:
+   - Visual 8-Case synthetic test pack verification (validating the 75% positive flag ratio and negative controls).
+   - Integrated live runner for automated Python unittest suites.
+5. **⚙️ Oracle Fusion Connection Manager**:
+   - Switch between local Mock Simulation Mode and Live Oracle Fusion Cloud REST API mode.
+   - Secure REST API credential configuration and connection health check.
+
+---
+
+## 💻 How to Run the Agent via CLI Console
 
 ### Prerequisites
-- Python 3.x
+- Python 3.x (Zero external dependencies needed!)
 
 ### Run the Interactive Console
 Execute the interactive console from the workspace root directory:
@@ -69,6 +107,8 @@ This presents a menu where you can:
 5. Connect to a live Oracle Fusion Cloud instance (requires URL, username, and password).
 6. Run automated unit tests.
 7. Configure credentials.
+8. Launch the Web UI directly.
+9. Exit.
 
 ---
 
