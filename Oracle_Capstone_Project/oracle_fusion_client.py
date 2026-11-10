@@ -232,65 +232,183 @@ class MockOracleFusionClient(OracleFusionClient):
             {"ledger_id": "1003", "name": "Canada Primary Ledger", "currency": "CAD", "chart_of_accounts": "CA_COA"}
         ]
 
-        # 2. Period Statuses (GL & COST) for period 'Dec-24'
+        # 2. Period Statuses (GL & COST) across periods
         self.period_statuses = {
-            "1001": {"GL": "Open", "COST": "Open"},
-            "1002": {"GL": "Open", "COST": "Open"},
-            "1003": {"GL": "Open", "COST": "Open"}
+            "Oct-24": {
+                "1001": {"GL": "Open", "COST": "Open"},
+                "1002": {"GL": "Open", "COST": "Open"},
+                "1003": {"GL": "Open", "COST": "Open"}
+            },
+            "Nov-24": {
+                "1001": {"GL": "Open", "COST": "Open"},
+                "1002": {"GL": "Open", "COST": "Open"},
+                "1003": {"GL": "Open", "COST": "Open"}
+            },
+            "Dec-24": {
+                "1001": {"GL": "Open", "COST": "Open"},
+                "1002": {"GL": "Open", "COST": "Open"},
+                "1003": {"GL": "Open", "COST": "Open"}
+            },
+            "Jan-25": {
+                "1001": {"GL": "Open", "COST": "Open"},
+                "1002": {"GL": "Open", "COST": "Open"},
+                "1003": {"GL": "Open", "COST": "Open"}
+            }
         }
 
-        # 3. Costing / PO Receipt Transactions
+        # 3. Costing / PO Receipt Transactions across periods & ledgers
         self.transactions = {
-            "1001": [
-                {
-                    "transaction_id": "TXN_COST_001",
-                    "po_number": "PO-2024-001",
-                    "receipt_number": "RC-99011",
-                    "item_number": "AS54888",
-                    "quantity": 100,
-                    "unit_of_measure": "Ea",
-                    "costing_status": "COSTED",
-                    "accounting_status": "ACCOUNTED",
-                    "error_message": None
-                },
-                {
-                    "transaction_id": "TXN_COST_002",
-                    "po_number": "PO-2024-002",
-                    "receipt_number": "RC-99012",
-                    "item_number": "CN-90812",
-                    "quantity": 50,
-                    "unit_of_measure": "Box",
-                    "costing_status": "ERROR",
-                    "accounting_status": "NOT_ACCOUNTED",
-                    "error_message": "Item cost definition is missing for item 'CN-90812' in US Cost Book."
-                }
-            ],
-            "1002": [
-                {
-                    "transaction_id": "TXN_COST_101",
-                    "po_number": "PO-2024-003",
-                    "receipt_number": "RC-99013",
-                    "item_number": "AS54888",
-                    "quantity": 10,
-                    "unit_of_measure": "Ea",
-                    "costing_status": "COSTED",
-                    "accounting_status": "ERROR",
-                    "error_message": "Subledger Journal Entry violates dynamic account combination rule 'UK_ACC_RULE'."
-                }
-            ],
-            "1003": [
-                {
-                    "transaction_id": "TXN_COST_201",
-                    "po_number": "PO-2024-004",
-                    "receipt_number": "RC-99014",
-                    "item_number": "CAD-ITEM-01",
-                    "quantity": 25,
-                    "unit_of_measure": "Kg",
-                    "costing_status": "COSTED",
-                    "accounting_status": "ACCOUNTED",
-                    "error_message": None
-                }
-            ]
+            "Dec-24": {
+                "1001": [
+                    {
+                        "transaction_id": "TXN_COST_001",
+                        "po_number": "PO-2024-001",
+                        "receipt_number": "RC-99011",
+                        "item_number": "AS54888",
+                        "quantity": 100,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    },
+                    {
+                        "transaction_id": "TXN_COST_002",
+                        "po_number": "PO-2024-002",
+                        "receipt_number": "RC-99012",
+                        "item_number": "CN-90812",
+                        "quantity": 50,
+                        "unit_of_measure": "Box",
+                        "costing_status": "ERROR",
+                        "accounting_status": "NOT_ACCOUNTED",
+                        "error_message": "Item cost definition is missing for item 'CN-90812' in US Cost Book."
+                    }
+                ],
+                "1002": [
+                    {
+                        "transaction_id": "TXN_COST_101",
+                        "po_number": "PO-2024-003",
+                        "receipt_number": "RC-99013",
+                        "item_number": "AS54888",
+                        "quantity": 10,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ERROR",
+                        "error_message": "Subledger Journal Entry violates dynamic account combination rule 'UK_ACC_RULE'."
+                    }
+                ],
+                "1003": [
+                    {
+                        "transaction_id": "TXN_COST_201",
+                        "po_number": "PO-2024-004",
+                        "receipt_number": "RC-99014",
+                        "item_number": "CAD-ITEM-01",
+                        "quantity": 25,
+                        "unit_of_measure": "Kg",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ]
+            },
+            "Oct-24": {
+                "1001": [
+                    {
+                        "transaction_id": "TXN_COST_OCT_101",
+                        "po_number": "PO-2024-0101",
+                        "receipt_number": "RC-10011",
+                        "item_number": "AS54888",
+                        "quantity": 200,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ],
+                "1002": [
+                    {
+                        "transaction_id": "TXN_COST_OCT_201",
+                        "po_number": "PO-2024-0201",
+                        "receipt_number": "RC-20011",
+                        "item_number": "UK-ITEM-001",
+                        "quantity": 150,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ],
+                "1003": [
+                    {
+                        "transaction_id": "TXN_COST_OCT_301",
+                        "po_number": "PO-2024-0301",
+                        "receipt_number": "RC-30011",
+                        "item_number": "CAD-ITEM-01",
+                        "quantity": 25,
+                        "unit_of_measure": "Kg",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ]
+            },
+            "Nov-24": {
+                "1001": [
+                    {
+                        "transaction_id": "TXN_COST_NOV_101",
+                        "po_number": "PO-2024-1101",
+                        "receipt_number": "RC-11011",
+                        "item_number": "AS54888",
+                        "quantity": 300,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ],
+                "1002": [
+                    {
+                        "transaction_id": "TXN_COST_NOV_201",
+                        "po_number": "PO-2024-1102",
+                        "receipt_number": "RC-11012",
+                        "item_number": "UK-ITEM-005",
+                        "quantity": 100,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ],
+                "1003": [
+                    {
+                        "transaction_id": "TXN_COST_NOV_301",
+                        "po_number": "PO-2024-1103",
+                        "receipt_number": "RC-11013",
+                        "item_number": "CAD-ITEM-01",
+                        "quantity": 50,
+                        "unit_of_measure": "Kg",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ]
+            },
+            "Jan-25": {
+                "1001": [
+                    {
+                        "transaction_id": "TXN_COST_JAN_101",
+                        "po_number": "PO-2025-0101",
+                        "receipt_number": "RC-25011",
+                        "item_number": "AS54888",
+                        "quantity": 150,
+                        "unit_of_measure": "Ea",
+                        "costing_status": "COSTED",
+                        "accounting_status": "ACCOUNTED",
+                        "error_message": None
+                    }
+                ],
+                "1002": [],
+                "1003": []
+            }
         }
 
         # ------------------------------------------------------------------ #
@@ -300,38 +418,145 @@ class MockOracleFusionClient(OracleFusionClient):
         # CASE 2 – AP invoice, accounted but not yet transferred to GL
         # CASE 7 – AP invoice, fully processed (negative control – must NOT flag)
         self.ap_transactions = {
-            "1001": [
-                {
-                    "record_id": "TEST-AP-INV-001",
-                    "module": "Payables",
-                    "period": "Dec-24",
-                    "supplier": "TEST-SUPPLIER-OMEGA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-1",
-                    "accounting_status": "NOT_ACCOUNTED",
-                    "transfer_status": "NOT_TRANSFERRED",
-                    "next_step": "Run Create Accounting for this invoice (accounting not yet created).",
-                },
-                {
-                    "record_id": "TEST-AP-INV-002",
-                    "module": "Payables",
-                    "period": "Dec-24",
-                    "supplier": "TEST-SUPPLIER-OMEGA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-2",
-                    "accounting_status": "ACCOUNTED",
-                    "transfer_status": "NOT_TRANSFERRED",
-                    "next_step": "Run Transfer Journal Entries to GL for this invoice.",
-                },
-                {
-                    "record_id": "TEST-AP-INV-007",
-                    "module": "Payables",
-                    "period": "Dec-24",
-                    "supplier": "TEST-SUPPLIER-OMEGA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-7",
-                    "accounting_status": "ACCOUNTED",
-                    "transfer_status": "TRANSFERRED",
-                    "next_step": None,
-                },
-            ]
+            "Dec-24": {
+                "1001": [
+                    {
+                        "record_id": "TEST-AP-INV-001",
+                        "module": "Payables",
+                        "period": "Dec-24",
+                        "supplier": "TEST-SUPPLIER-OMEGA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-1",
+                        "accounting_status": "NOT_ACCOUNTED",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "next_step": "Run Create Accounting for this invoice (accounting not yet created).",
+                    },
+                    {
+                        "record_id": "TEST-AP-INV-002",
+                        "module": "Payables",
+                        "period": "Dec-24",
+                        "supplier": "TEST-SUPPLIER-OMEGA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-2",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "next_step": "Run Transfer Journal Entries to GL for this invoice.",
+                    },
+                    {
+                        "record_id": "TEST-AP-INV-007",
+                        "module": "Payables",
+                        "period": "Dec-24",
+                        "supplier": "TEST-SUPPLIER-OMEGA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-7",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    },
+                ],
+                "1002": [
+                    {
+                        "record_id": "AP-INV-DEC-201",
+                        "module": "Payables",
+                        "period": "Dec-24",
+                        "supplier": "BRIT-IMPORTS-LTD",
+                        "description": "UK standard freight invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AP-INV-DEC-301",
+                        "module": "Payables",
+                        "period": "Dec-24",
+                        "supplier": "MAPLE-DIST-INC",
+                        "description": "Canadian packaging supplier invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Nov-24": {
+                "1001": [
+                    {
+                        "record_id": "AP-INV-A401",
+                        "module": "Payables",
+                        "period": "Nov-24",
+                        "supplier": "TECH-PARTS-CORP",
+                        "description": "US hardware parts invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "AP-INV-B901",
+                        "module": "Payables",
+                        "period": "Nov-24",
+                        "supplier": "UK-VENDOR-DELTA",
+                        "description": "UK logistics services invoice requiring accounting",
+                        "accounting_status": "NOT_ACCOUNTED",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "next_step": "Run Create Accounting for AP-INV-B901, then Transfer to GL.",
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AP-INV-A501",
+                        "module": "Payables",
+                        "period": "Nov-24",
+                        "supplier": "CANWEST-SUPPLIES",
+                        "description": "Calgary distribution invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Oct-24": {
+                "1001": [
+                    {
+                        "record_id": "AP-INV-A101",
+                        "module": "Payables",
+                        "period": "Oct-24",
+                        "supplier": "ACME-SUPPLIES-INC",
+                        "description": "Oct manufacturing supplies",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "AP-INV-A201",
+                        "module": "Payables",
+                        "period": "Oct-24",
+                        "supplier": "BRIT-IMPORTS-LTD",
+                        "description": "Oct UK imports invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AP-INV-A301",
+                        "module": "Payables",
+                        "period": "Oct-24",
+                        "supplier": "MAPLE-DIST-INC",
+                        "description": "Oct Maple distribution invoice",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Jan-25": {
+                "1001": [],
+                "1002": [],
+                "1003": []
+            }
         }
 
         # ------------------------------------------------------------------ #
@@ -341,38 +566,145 @@ class MockOracleFusionClient(OracleFusionClient):
         # CASE 4 – AR invoice, accounted but not transferred to GL
         # CASE 8 – AR invoice, fully processed (negative control – must NOT flag)
         self.ar_transactions = {
-            "1001": [
-                {
-                    "record_id": "TEST-AR-INV-003",
-                    "module": "Receivables",
-                    "period": "Dec-24",
-                    "customer": "TEST-CUSTOMER-ALPHA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-3",
-                    "accounting_status": "NOT_ACCOUNTED",
-                    "transfer_status": "NOT_TRANSFERRED",
-                    "next_step": "Run Create Accounting for this transaction (accounting not yet created).",
-                },
-                {
-                    "record_id": "TEST-AR-INV-004",
-                    "module": "Receivables",
-                    "period": "Dec-24",
-                    "customer": "TEST-CUSTOMER-ALPHA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-4",
-                    "accounting_status": "ACCOUNTED",
-                    "transfer_status": "NOT_TRANSFERRED",
-                    "next_step": "Run Transfer Journal Entries to GL for this transaction.",
-                },
-                {
-                    "record_id": "TEST-AR-INV-008",
-                    "module": "Receivables",
-                    "period": "Dec-24",
-                    "customer": "TEST-CUSTOMER-ALPHA",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-8",
-                    "accounting_status": "ACCOUNTED",
-                    "transfer_status": "TRANSFERRED",
-                    "next_step": None,
-                },
-            ]
+            "Dec-24": {
+                "1001": [
+                    {
+                        "record_id": "TEST-AR-INV-003",
+                        "module": "Receivables",
+                        "period": "Dec-24",
+                        "customer": "TEST-CUSTOMER-ALPHA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-3",
+                        "accounting_status": "NOT_ACCOUNTED",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "next_step": "Run Create Accounting for this transaction (accounting not yet created).",
+                    },
+                    {
+                        "record_id": "TEST-AR-INV-004",
+                        "module": "Receivables",
+                        "period": "Dec-24",
+                        "customer": "TEST-CUSTOMER-ALPHA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-4",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "next_step": "Run Transfer Journal Entries to GL for this transaction.",
+                    },
+                    {
+                        "record_id": "TEST-AR-INV-008",
+                        "module": "Receivables",
+                        "period": "Dec-24",
+                        "customer": "TEST-CUSTOMER-ALPHA",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-8",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    },
+                ],
+                "1002": [
+                    {
+                        "record_id": "AR-INV-DEC-201",
+                        "module": "Receivables",
+                        "period": "Dec-24",
+                        "customer": "LONDON-TECH-PLC",
+                        "description": "London software consulting bill",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AR-INV-DEC-301",
+                        "module": "Receivables",
+                        "period": "Dec-24",
+                        "customer": "TORONTO-INDUSTRIAL",
+                        "description": "Toronto industrial goods bill",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Nov-24": {
+                "1001": [
+                    {
+                        "record_id": "AR-INV-A401",
+                        "module": "Receivables",
+                        "period": "Nov-24",
+                        "customer": "WESTCOAST-RETAIL",
+                        "description": "Nov retail revenue transaction",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "AR-INV-A201",
+                        "module": "Receivables",
+                        "period": "Nov-24",
+                        "customer": "LONDON-TECH-PLC",
+                        "description": "Nov UK cloud services bill",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AR-INV-A501",
+                        "module": "Receivables",
+                        "period": "Nov-24",
+                        "customer": "CALGARY-LOGISTICS",
+                        "description": "Nov freight revenue transaction",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Oct-24": {
+                "1001": [
+                    {
+                        "record_id": "AR-INV-A101",
+                        "module": "Receivables",
+                        "period": "Oct-24",
+                        "customer": "NORTHSTAR-RETAIL",
+                        "description": "Oct Northstar billing",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "AR-INV-A201",
+                        "module": "Receivables",
+                        "period": "Oct-24",
+                        "customer": "LONDON-TECH-PLC",
+                        "description": "Oct London tech billing",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "AR-INV-A301",
+                        "module": "Receivables",
+                        "period": "Oct-24",
+                        "customer": "TORONTO-INDUSTRIAL",
+                        "description": "Oct Toronto industrial billing",
+                        "accounting_status": "ACCOUNTED",
+                        "transfer_status": "TRANSFERRED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Jan-25": {
+                "1001": [],
+                "1002": [],
+                "1003": []
+            }
         }
 
         # ------------------------------------------------------------------ #
@@ -382,69 +714,184 @@ class MockOracleFusionClient(OracleFusionClient):
         # CASE 6 – Receipt transferred to Cost Management but NOT yet costed
         # (Cases 7 & 8 negative controls are covered in AP/AR tables above)
         self.inventory_transactions = {
-            "1001": [
-                {
-                    "record_id": "TEST-INV-RCT-005",
-                    "module": "Inventory / Cost Management",
-                    "period": "Dec-24",
-                    "organization": "TEST-ORG-M1",
-                    "item": "TEST-ITEM-XZ100",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-5",
-                    "transfer_status": "NOT_TRANSFERRED",
-                    "costing_status": "NOT_COSTED",
-                    "next_step": (
-                        "Transfer inventory transaction to Cost Management "
-                        "(cost processor has not yet picked up this receipt)."
-                    ),
-                },
-                {
-                    "record_id": "TEST-INV-RCT-006",
-                    "module": "Inventory / Cost Management",
-                    "period": "Dec-24",
-                    "organization": "TEST-ORG-M1",
-                    "item": "TEST-ITEM-XZ100",
-                    "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-6",
-                    "transfer_status": "TRANSFERRED",
-                    "costing_status": "NOT_COSTED",
-                    "next_step": (
-                        "Cost this transaction in Cost Management "
-                        "(transferred but cost processor has not completed costing)."
-                    ),
-                },
-            ]
+            "Dec-24": {
+                "1001": [
+                    {
+                        "record_id": "TEST-INV-RCT-005",
+                        "module": "Inventory / Cost Management",
+                        "period": "Dec-24",
+                        "organization": "TEST-ORG-M1",
+                        "item": "TEST-ITEM-XZ100",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-5",
+                        "transfer_status": "NOT_TRANSFERRED",
+                        "costing_status": "NOT_COSTED",
+                        "next_step": (
+                            "Transfer inventory transaction to Cost Management "
+                            "(cost processor has not yet picked up this receipt)."
+                        ),
+                    },
+                    {
+                        "record_id": "TEST-INV-RCT-006",
+                        "module": "Inventory / Cost Management",
+                        "period": "Dec-24",
+                        "organization": "TEST-ORG-M1",
+                        "item": "TEST-ITEM-XZ100",
+                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-6",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "NOT_COSTED",
+                        "next_step": (
+                            "Cost this transaction in Cost Management "
+                            "(transferred but cost processor has not completed costing)."
+                        ),
+                    },
+                ],
+                "1002": [
+                    {
+                        "record_id": "INV-RCT-DEC-201",
+                        "module": "Inventory / Cost Management",
+                        "period": "Dec-24",
+                        "organization": "UK-PLANT-LON",
+                        "item": "UK-ITEM-001",
+                        "description": "UK inventory movement fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "INV-RCT-DEC-301",
+                        "module": "Inventory / Cost Management",
+                        "period": "Dec-24",
+                        "organization": "CA-PLANT-TOR",
+                        "item": "CAD-ITEM-01",
+                        "description": "Canada inventory receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Nov-24": {
+                "1001": [
+                    {
+                        "record_id": "INV-RCT-A401",
+                        "module": "Inventory / Cost Management",
+                        "period": "Nov-24",
+                        "organization": "MFG-PLANT-01",
+                        "item": "COMP-CPU-001",
+                        "description": "Nov US warehouse receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "INV-RCT-B901",
+                        "module": "Inventory / Cost Management",
+                        "period": "Nov-24",
+                        "organization": "UK-PLANT-LON",
+                        "item": "UK-ITEM-005",
+                        "description": "Item in Cost Management queue but not yet costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "NOT_COSTED",
+                        "next_step": "Run Cost Accounting process for UK-PLANT-LON.",
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "INV-RCT-A501",
+                        "module": "Inventory / Cost Management",
+                        "period": "Nov-24",
+                        "organization": "CA-PLANT-TOR",
+                        "item": "CAD-ITEM-01",
+                        "description": "Nov Canada warehouse receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Oct-24": {
+                "1001": [
+                    {
+                        "record_id": "INV-RCT-A101",
+                        "module": "Inventory / Cost Management",
+                        "period": "Oct-24",
+                        "organization": "MFG-PLANT-01",
+                        "item": "AS54888",
+                        "description": "Oct US warehouse receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ],
+                "1002": [
+                    {
+                        "record_id": "INV-RCT-A201",
+                        "module": "Inventory / Cost Management",
+                        "period": "Oct-24",
+                        "organization": "UK-PLANT-LON",
+                        "item": "UK-ITEM-001",
+                        "description": "Oct UK warehouse receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ],
+                "1003": [
+                    {
+                        "record_id": "INV-RCT-A301",
+                        "module": "Inventory / Cost Management",
+                        "period": "Oct-24",
+                        "organization": "CA-PLANT-TOR",
+                        "item": "CAD-ITEM-01",
+                        "description": "Oct Canada warehouse receipt fully costed",
+                        "transfer_status": "TRANSFERRED",
+                        "costing_status": "COSTED",
+                        "next_step": None,
+                    }
+                ]
+            },
+            "Jan-25": {
+                "1001": [],
+                "1002": [],
+                "1003": []
+            }
         }
 
-        # Adapt mock database based on the active scenario
+        # Adapt mock database based on the active scenario for Dec-24
+        dec_txns = self.transactions["Dec-24"]
         if self.scenario_name == "all_clear":
-            # Fix all costing errors
-            for ledger_id in self.transactions:
-                for txn in self.transactions[ledger_id]:
+            # Fix all costing errors across all ledgers in Dec-24
+            for ledger_id in dec_txns:
+                for txn in dec_txns[ledger_id]:
                     txn["costing_status"] = "COSTED"
                     txn["accounting_status"] = "ACCOUNTED"
                     txn["error_message"] = None
         elif self.scenario_name == "po_costing_hold_only":
             # Only Ledger 1001 has errors, ledger 1002 is cleared
-            self.transactions["1002"][0]["accounting_status"] = "ACCOUNTED"
-            self.transactions["1002"][0]["error_message"] = None
+            dec_txns["1002"][0]["accounting_status"] = "ACCOUNTED"
+            dec_txns["1002"][0]["error_message"] = None
         elif self.scenario_name == "unaccounted_hold_only":
             # Only Ledger 1002 has errors, ledger 1001 is cleared
-            self.transactions["1001"][1]["costing_status"] = "COSTED"
-            self.transactions["1001"][1]["accounting_status"] = "ACCOUNTED"
-            self.transactions["1001"][1]["error_message"] = None
+            dec_txns["1001"][1]["costing_status"] = "COSTED"
+            dec_txns["1001"][1]["accounting_status"] = "ACCOUNTED"
+            dec_txns["1001"][1]["error_message"] = None
 
     def get_ledgers(self):
         return self.ledgers
 
     def get_period_statuses(self, ledger_id: str, period_name: str):
-        if period_name != "Dec-24":
-            return {"GL": "Closed", "COST": "Closed"}
-        return self.period_statuses.get(ledger_id, {"GL": "Never Opened", "COST": "Never Opened"})
+        p_data = self.period_statuses.get(period_name)
+        if not p_data:
+            return {"GL": "Never Opened", "COST": "Never Opened"}
+        return p_data.get(ledger_id, {"GL": "Never Opened", "COST": "Never Opened"})
 
     def get_costing_transactions(self, ledger_id: str, period_name: str):
-        if period_name != "Dec-24":
-            return []
-
-        txns = self.transactions.get(ledger_id, [])
+        p_txns = self.transactions.get(period_name, {})
+        txns = p_txns.get(ledger_id, [])
         blockers = []
         for t in txns:
             if t["costing_status"] in ["ERROR", "UNPROCESSED"] or t["accounting_status"] in ["ERROR", "NOT_ACCOUNTED"]:
@@ -452,8 +899,8 @@ class MockOracleFusionClient(OracleFusionClient):
         return blockers
 
     def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
-        if period_name != "Dec-Dec-24" and period_name != "Dec-24":
-            raise Exception("Cannot close periods other than 'Dec-24' in mock environment.")
+        if period_name not in self.period_statuses:
+            raise Exception(f"Cannot close unrecognized period '{period_name}' in mock environment.")
 
         blockers = self.get_costing_transactions(ledger_id, period_name)
         if application == "COST" and blockers:
@@ -464,15 +911,15 @@ class MockOracleFusionClient(OracleFusionClient):
             if stat.get("COST") != "Closed":
                 raise Exception(f"Cannot close GL period: Costing period must be closed first.")
 
-        if ledger_id in self.period_statuses:
-            self.period_statuses[ledger_id][application] = "Closed"
+        p_statuses = self.period_statuses[period_name]
+        if ledger_id in p_statuses:
+            p_statuses[ledger_id][application] = "Closed"
             return True
         return False
 
     def get_ap_transactions(self, ledger_id: str, period_name: str):
-        if period_name != "Dec-24":
-            return []
-        records = self.ap_transactions.get(ledger_id, [])
+        p_ap = self.ap_transactions.get(period_name, {})
+        records = p_ap.get(ledger_id, [])
         flags = []
         for r in records:
             if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
@@ -480,9 +927,8 @@ class MockOracleFusionClient(OracleFusionClient):
         return flags
 
     def get_ar_transactions(self, ledger_id: str, period_name: str):
-        if period_name != "Dec-24":
-            return []
-        records = self.ar_transactions.get(ledger_id, [])
+        p_ar = self.ar_transactions.get(period_name, {})
+        records = p_ar.get(ledger_id, [])
         flags = []
         for r in records:
             if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
@@ -490,9 +936,8 @@ class MockOracleFusionClient(OracleFusionClient):
         return flags
 
     def get_inventory_transactions(self, ledger_id: str, period_name: str):
-        if period_name != "Dec-24":
-            return []
-        records = self.inventory_transactions.get(ledger_id, [])
+        p_inv = self.inventory_transactions.get(period_name, {})
+        records = p_inv.get(ledger_id, [])
         flags = []
         for r in records:
             if r["transfer_status"] != "TRANSFERRED" or r["costing_status"] == "NOT_COSTED":

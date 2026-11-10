@@ -13,8 +13,22 @@ TABLE OF CONTENTS
 4. GLOBAL LEDGER TOPOLOGY & MODULE ARCHITECTURE
 5. SIX-STEP MANDATORY PERIOD CLOSE HIERARCHY
 6. SUBLEDGER RUNBOOK PROCEDURES & ESS JOB SPECIFICATIONS
-7. SECTION A — CLEAN SCENARIOS (ABLE TO CLOSE)
-8. SECTION B — BLOCKED SCENARIOS & RUNBOOK REMEDIATION PLAYBOOKS
+7. SECTION A — CLEAN SCENARIOS ACROSS ALL 5 SUBLEDGERS (ABLE TO CLOSE)
+   - Scenario A-1: US Primary Ledger (Oct-24) — Full 5-Subledger Clean Audit
+   - Scenario A-2: UK Primary Ledger (Oct-24) — Full 5-Subledger Clean Audit
+   - Scenario A-3: Canada Primary Ledger (Oct-24) — Full 5-Subledger Clean Audit
+   - Scenario A-4: Global Multi-Ledger Set (Nov-24) — Full 5-Subledger Clean Audit
+   - Scenario A-5: Global Multi-Ledger Set (Jan-25) — Next Period Clean Baseline
+8. SECTION B — BLOCKED SCENARIOS ACROSS ALL 5 SUBLEDGERS & RUNBOOK PLAYBOOKS
+   - Scenario B-1: Costing Blocker — Missing Cost Profile (US 1001, Dec-24)
+   - Scenario B-2: SLA Blocker — Dynamic Account Rule Violation (UK 1002, Dec-24)
+   - Scenario B-3: AP Blocker — Invoice Not Accounted (US 1001, Dec-24)
+   - Scenario B-4: AP Blocker — Journal Accounted Not Transferred (US 1001, Dec-24)
+   - Scenario B-5: AR Blocker — Transaction Not Accounted (US 1001, Dec-24)
+   - Scenario B-6: AR Blocker — Journal Accounted Not Transferred (US 1001, Dec-24)
+   - Scenario B-7: Inventory Blocker — Not Transferred to Cost Mgmt (US 1001, Dec-24)
+   - Scenario B-8: Inventory Blocker — Transferred Not Yet Costed (US 1001, Dec-24)
+   - Scenario B-9: Multi-Module Cross-Hold — AP + Inventory (UK 1002, Nov-24)
 9. SYNTHETIC 8-CASE TEST PACK RUNBOOK DATASET
 10. SIGN-OFF, AUDIT & COMPLIANCE CRITERIA
 
@@ -28,11 +42,13 @@ and Supply Chain Management (Cost Management, Inventory Management).
 
 The agent eliminates manual period-end friction by:
   1. Performing non-invasive multi-module readiness assessments across active ledgers.
-  2. Pinpointing transaction-level blockers (PO numbers, Receipt numbers, Item IDs,
+  2. Auditing all 5 core Oracle subledgers (Cost Management, Subledger SLA, Payables,
+     Receivables, Inventory Management) before authorizing period closure.
+  3. Pinpointing transaction-level blockers (PO numbers, Receipt numbers, Item IDs,
      SLA error codes, and Oracle ESS job failures).
-  3. Prescribing exact, step-by-step runbook remediation procedures.
-  4. Enforcing strict close sequencing (Costing closed prior to General Ledger).
-  5. Autonomously executing period close REST API transactions when gates pass.
+  4. Prescribing exact, step-by-step runbook remediation procedures.
+  5. Enforcing strict close sequencing (Costing closed prior to General Ledger).
+  6. Autonomously executing period close REST API transactions when gates pass.
 
 REST API Target Namespace:
   /fscmRestApp/resources/11.13.18.05/ledgers
@@ -49,8 +65,8 @@ The standard enterprise financial close cycle operates across a 5-day window:
 
   TIMELINE  | RUNBOOK PHASE               | KEY OPERATIONAL ACTIVITIES
   ----------|-----------------------------|-------------------------------------
-  Day -2    | Pre-Close Readiness Scan    | Run Agent Readiness Check; identify
-            |                             | missing item costs and SLA errors.
+  Day -2    | Pre-Close Readiness Scan    | Run Agent Readiness Check; audit all 5
+            |                             | subledgers for missing costs & errors.
   Day -1    | Subledger Cutoff & Freeze   | Freeze PO receipts and invoice entry;
             |                             | execute upstream inventory transfers.
   Day  0    | Costing & SLA Finalization  | Run Cost Accounting; resolve holds;
@@ -68,6 +84,7 @@ The standard enterprise financial close cycle operates across a 5-day window:
   Cost Accountant        | Item costs, PO receipt costing, CM  | Tier 1: Inventory
   Payables (AP) Lead     | Invoice validation, AP accounting   | Tier 1: Procurement
   Receivables (AR) Lead  | Revenue recognition, AR accounting  | Tier 1: Sales Ops
+  Inventory Controller   | Material movements, CM transfers    | Tier 1: Warehouse
   GL Controller          | Trial balance review, final close   | Tier 2: Finance Dir
   Oracle ERP Admin       | Dynamic SLA rules, ESS job recovery | Tier 3: IT Support
 
@@ -139,7 +156,7 @@ RUNBOOK PROCEDURE 4: Transfer Subledger Journal Entries to GL
 
 
 ================================================================================
-7. SECTION A — CLEAN SCENARIOS (ABLE TO CLOSE)
+7. SECTION A — CLEAN SCENARIOS ACROSS ALL 5 SUBLEDGERS (ABLE TO CLOSE)
 ================================================================================
 
 --------------------------------------------------------------------------------
@@ -148,24 +165,35 @@ SCENARIO A-1: Single Clean Ledger (US Primary Ledger)
   Period        : Oct-24
   Ledger ID     : 1001 (US Primary Ledger)
   Currency      : USD
-  Costing Status: Open
-  GL Status     : Open
-  Close Verdict : READY TO CLOSE
+  Costing Status: Open -> Closed
+  GL Status     : Open -> Closed
+  Close Verdict : READY TO CLOSE (100% PASS ACROSS ALL SUBLEDGERS)
 
-SUBLEDGER AUDIT:
-  1. Costing & PO Receipts:
-     - TXN_COST_A101 | PO-2024-0101 | RC-10011 | Item: AS54888 | Qty: 200 Ea
-       Costing: COSTED | Accounting: ACCOUNTED | Error: None (CLEAN)
-     - TXN_COST_A102 | PO-2024-0102 | RC-10012 | Item: MK-77231 | Qty: 500 Box
-       Costing: COSTED | Accounting: ACCOUNTED | Error: None (CLEAN)
-  2. Payables (AP):
-     - AP-INV-A101 | Supplier: ACME-SUPPLIES-INC | Accounting: ACCOUNTED | Transfer: TRANSFERRED
-     - AP-INV-A102 | Supplier: GLOBAL-FREIGHT-CO | Accounting: ACCOUNTED | Transfer: TRANSFERRED
-  3. Receivables (AR):
-     - AR-INV-A101 | Customer: NORTHSTAR-RETAIL  | Accounting: ACCOUNTED | Transfer: TRANSFERRED
-     - AR-INV-A102 | Customer: EASTPORT-WHOLESALE| Accounting: ACCOUNTED | Transfer: TRANSFERRED
-  4. Inventory:
-     - INV-RCT-A101 | Org: MFG-PLANT-01 | Item: AS54888 | Transfer: TRANSFERRED | Costing: COSTED
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management (Costing):
+     - TXN_COST_OCT_101 | PO: PO-2024-0101 | Receipt: RC-10011 | Item: AS54888 | Qty: 200 Ea
+       Costing Status: COSTED | Accounting Status: ACCOUNTED | Error: None
+       -> VERDICT: PASS (Fully costed and accounted)
+  2. Subledger Accounting (SLA):
+     - Dynamic Insertion & Account Derivation Rules: All journal combinations valid.
+     - Journal Balancing: Debits = Credits across all subledger distributions.
+       -> VERDICT: PASS (No rule violations)
+  3. Payables (AP):
+     - AP-INV-A101 | Supplier: ACME-SUPPLIES-INC | Period: Oct-24 | Amount: $45,000.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+     - AP-INV-A102 | Supplier: GLOBAL-FREIGHT-CO | Period: Oct-24 | Amount: $12,450.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+       -> VERDICT: PASS (All invoices accounted and transferred)
+  4. Receivables (AR):
+     - AR-INV-A101 | Customer: NORTHSTAR-RETAIL  | Period: Oct-24 | Amount: $88,200.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+     - AR-INV-A102 | Customer: EASTPORT-WHOLESALE| Period: Oct-24 | Amount: $34,100.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+       -> VERDICT: PASS (All revenue transactions posted to GL)
+  5. Inventory Management:
+     - INV-RCT-A101 | Org: MFG-PLANT-01 | Item: AS54888 | Qty: 200 Ea | Period: Oct-24
+       Transfer to Cost Mgmt: TRANSFERRED | Costing Status: COSTED | Next Step: None
+       -> VERDICT: PASS (All material transactions transferred and costed)
 
 RUNBOOK CLOSE EXECUTION:
   Step 1: Execute POST /fscmRestApp/resources/.../ledgerPeriods (Costing, AppId 10078) -> Status: Closed
@@ -173,25 +201,83 @@ RUNBOOK CLOSE EXECUTION:
   Outcome: SUCCESS — Period Oct-24 fully closed for Ledger 1001.
 
 --------------------------------------------------------------------------------
-SCENARIO A-2: Global Multi-Ledger Set All Clean (US, UK, Canada)
+SCENARIO A-2: UK Primary Ledger Clean Close
+--------------------------------------------------------------------------------
+  Period        : Oct-24
+  Ledger ID     : 1002 (UK Primary Ledger)
+  Currency      : GBP
+  Costing Status: Open -> Closed
+  GL Status     : Open -> Closed
+  Close Verdict : READY TO CLOSE (100% PASS ACROSS ALL SUBLEDGERS)
+
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management (Costing):
+     - TXN_COST_OCT_201 | PO: PO-2024-0201 | Receipt: RC-20011 | Item: UK-ITEM-001 | Qty: 150 Ea
+       Costing Status: COSTED | Accounting Status: ACCOUNTED | Error: None
+       -> VERDICT: PASS
+  2. Subledger Accounting (SLA):
+     - Dynamic Rule 'UK_ACC_RULE': Fully compliant. Cost accounts mapped.
+       -> VERDICT: PASS
+  3. Payables (AP):
+     - AP-INV-A201 | Supplier: BRIT-IMPORTS-LTD | Period: Oct-24 | Amount: £28,500.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+       -> VERDICT: PASS
+  4. Receivables (AR):
+     - AR-INV-A201 | Customer: LONDON-TECH-PLC | Period: Oct-24 | Amount: £64,000.00
+       Accounting Status: ACCOUNTED | Transfer Status: TRANSFERRED | Next Step: None
+       -> VERDICT: PASS
+  5. Inventory Management:
+     - INV-RCT-A201 | Org: UK-PLANT-LON | Item: UK-ITEM-001 | Qty: 150 Ea | Period: Oct-24
+       Transfer to Cost Mgmt: TRANSFERRED | Costing Status: COSTED | Next Step: None
+       -> VERDICT: PASS
+
+RUNBOOK CLOSE EXECUTION:
+  - Close Costing Period (AppId 10078) -> Status: Closed
+  - Close GL Period (AppId 101)        -> Status: Closed
+  - Outcome: SUCCESS — Period Oct-24 fully closed for UK Ledger.
+
+--------------------------------------------------------------------------------
+SCENARIO A-3: Canada Primary Ledger Clean Close
+--------------------------------------------------------------------------------
+  Period        : Oct-24
+  Ledger ID     : 1003 (Canada Primary Ledger)
+  Currency      : CAD
+  Costing Status: Open -> Closed
+  GL Status     : Open -> Closed
+  Close Verdict : READY TO CLOSE (100% PASS ACROSS ALL SUBLEDGERS)
+
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: TXN_COST_OCT_301 | Item: CAD-ITEM-01 | Costing: COSTED | SLA: ACCOUNTED
+  2. Subledger Accounting: CA_CORP_COA rules compliant. No unposted entries.
+  3. Payables (AP): AP-INV-A301 | Supplier: MAPLE-DIST-INC | ACCOUNTED / TRANSFERRED
+  4. Receivables (AR): AR-INV-A301 | Customer: TORONTO-INDUSTRIAL | ACCOUNTED / TRANSFERRED
+  5. Inventory Management: INV-RCT-A301 | Org: CA-PLANT-TOR | TRANSFERRED / COSTED
+  Outcome: SUCCESS — Period Oct-24 fully closed for Canada Ledger.
+
+--------------------------------------------------------------------------------
+SCENARIO A-4: Global Multi-Ledger Set All Clean (US, UK, Canada)
 --------------------------------------------------------------------------------
   Period        : Nov-24
   Ledgers       : 1001 (US), 1002 (UK), 1003 (Canada)
-  Close Verdict : READY TO CLOSE ACROSS ALL LEDGERS
+  Close Verdict : READY TO CLOSE ACROSS ALL 3 LEDGERS
 
-SUBLEDGER AUDIT:
-  - US Ledger 1001 : All PO receipts costed, AP/AR transferred, Inventory costed.
-  - UK Ledger 1002 : PO receipts costed, account rules compliant, AP/AR clean.
-  - CA Ledger 1003 : Fully accounted and transferred.
+COMPLETE 5-SUBLEDGER AUDIT PER LEDGER:
+  - US Ledger 1001 : Costing clean (TXN_COST_NOV_101), AP clean (AP-INV-A401), AR clean (AR-INV-A401), Inv clean (INV-RCT-A401).
+  - UK Ledger 1002 : Costing clean (TXN_COST_NOV_201), AP clean (AP-INV-A201), AR clean (AR-INV-A201), Inv clean (INV-RCT-A201).
+  - CA Ledger 1003 : Costing clean (TXN_COST_NOV_301), AP clean (AP-INV-A501), AR clean (AR-INV-A501), Inv clean (INV-RCT-A501).
+  Outcome: COMPLETED — Costing and GL periods closed across all three ledgers.
 
-RUNBOOK CLOSE EXECUTION:
-  - Close Costing Period for 1001, 1002, 1003 -> All Closed.
-  - Close GL Period for 1001, 1002, 1003      -> All Closed.
-  - Overall Close Status: COMPLETED.
+--------------------------------------------------------------------------------
+SCENARIO A-5: Global Multi-Ledger Set Clean Initial Baseline (Jan-25)
+--------------------------------------------------------------------------------
+  Period        : Jan-25
+  Ledgers       : 1001 (US), 1002 (UK), 1003 (Canada)
+  Close Verdict : READY TO CLOSE (Baseline Clean Initialized State)
+  - All 5 subledgers verified clean with zero outstanding distributions.
 
 
 ================================================================================
-8. SECTION B — BLOCKED SCENARIOS & RUNBOOK REMEDIATION PLAYBOOKS
+8. SECTION B — BLOCKED SCENARIOS ACROSS ALL 5 SUBLEDGERS & RUNBOOK PLAYBOOKS
 ================================================================================
 
 --------------------------------------------------------------------------------
@@ -201,35 +287,24 @@ SCENARIO B-1: Missing Item Cost Definition in US Cost Book
   Ledger ID     : 1001 (US Primary Ledger)
   Costing Status: Open (BLOCKED)
   GL Status     : Open (BLOCKED)
-  Verdict       : HOLD — Costing Subledger Blocker
+  Verdict       : HOLD — Cost Management Subledger Blocker
 
-BLOCKING TRANSACTION:
-  Transaction ID    : TXN_COST_002
-  Purchase Order    : PO-2024-002
-  Receipt Number    : RC-99012
-  Item Number       : CN-90812 (Description: Industrial Connector Box)
-  Quantity / UOM    : 50 Box
-  Costing Status    : ERROR
-  Accounting Status : NOT_ACCOUNTED
-  Oracle Error Code : CST_NO_COST_PROFILE_DEFINED
-  Error Message     : "Item cost definition is missing for item 'CN-90812' in US Cost Book."
-
-TECHNICAL ROOT CAUSE:
-  The receiving organization 'MFG-PLANT-01' uses Standard Costing in Cost Book 'US_COST_BOOK'.
-  Item 'CN-90812' was received before standard cost and valuation profiles were defined.
-  The cost distribution processor threw an uncosted exception and halted journal creation.
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management (Costing): [FAIL — 1 BLOCKER FOUND]
+     - TXN_COST_001 | PO-2024-001 | RC-99011 | Item: AS54888 | Qty: 100 Ea -> COSTED / ACCOUNTED (CLEAN)
+     - TXN_COST_002 | PO-2024-002 | RC-99012 | Item: CN-90812 | Qty: 50 Box
+       Costing Status: ERROR | Accounting Status: NOT_ACCOUNTED
+       Error: "Item cost definition is missing for item 'CN-90812' in US Cost Book."
+  2. Subledger Accounting (SLA): [HOLD — Blocked by uncosted distribution]
+  3. Payables (AP): [AUDITED — Clean for this test scenario / no blocking holds]
+  4. Receivables (AR): [AUDITED — Clean / no revenue recognition holds]
+  5. Inventory Management: [AUDITED — Upstream receipt RC-99012 transferred to CM]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Cost Accountant (US Region)
-  2. SLA Time Limit: 30 minutes
-  3. Action Steps  :
-     a. Log into Oracle Fusion Cloud > Supply Chain Execution > Cost Management.
-     b. Navigate to: Manage Item Costs task.
-     c. Search for Item: 'CN-90812' | Cost Org: 'US Cost Org' | Cost Book: 'US_COST_BOOK'.
-     d. Create new Standard Cost Profile with effective date starting prior to receipt date.
-     e. Navigate to Scheduled Processes and submit "Create Cost Accounting Distributions".
-     f. Verify TXN_COST_002 changes to Costing Status: COSTED and Accounting Status: ACCOUNTED.
-  4. Post-Fix Action: Retry Agent Close Request.
+  - Role Assigned : Cost Accountant (US Region)
+  - Navigation    : Supply Chain Execution > Cost Management > Manage Item Costs
+  - Action Steps  : Define standard cost profile for CN-90812 in US Cost Book. Re-run "Create Cost Accounting Distributions".
+  - Outcome       : Once resolved, unblocks Costing and GL period closure.
 
 --------------------------------------------------------------------------------
 SCENARIO B-2: Subledger Journal Dynamic Account Rule Violation (UK SLA)
@@ -240,33 +315,20 @@ SCENARIO B-2: Subledger Journal Dynamic Account Rule Violation (UK SLA)
   GL Status     : Open (BLOCKED)
   Verdict       : HOLD — Subledger Accounting Rule Blocker
 
-BLOCKING TRANSACTION:
-  Transaction ID    : TXN_COST_101
-  Purchase Order    : PO-2024-003
-  Receipt Number    : RC-99013
-  Item Number       : AS54888 (Description: Power Supply Unit)
-  Quantity / UOM    : 10 Ea
-  Costing Status    : COSTED
-  Accounting Status : ERROR
-  Oracle Error Code : XLA_RULE_COMBINATION_INVALID
-  Error Message     : "Subledger Journal Entry violates dynamic account combination rule 'UK_ACC_RULE'."
-
-TECHNICAL ROOT CAUSE:
-  Cost computation succeeded (Costing Status = COSTED). However, the subledger accounting engine
-  failed to derive a valid GL account combination because segment 3 (Department) and segment 4
-  (Natural Account) violated cross-validation rule UK_ACC_RULE in UK_CORP_COA.
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management (Costing): [PASS — Cost computation complete]
+  2. Subledger Accounting (SLA): [FAIL — 1 BLOCKER FOUND]
+     - TXN_COST_101 | PO-2024-003 | RC-99013 | Item: AS54888 | Qty: 10 Ea
+       Costing Status: COSTED | Accounting Status: ERROR
+       Error: "Subledger Journal Entry violates dynamic account combination rule 'UK_ACC_RULE'."
+  3. Payables (AP): [AUDITED — Clean / AP-INV-DEC-201 accounted and transferred]
+  4. Receivables (AR): [AUDITED — Clean / AR-INV-DEC-201 accounted and transferred]
+  5. Inventory Management: [AUDITED — INV-RCT-DEC-201 transferred and costed]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Oracle Subledger Accounting Specialist / Financial Systems Admin
-  2. SLA Time Limit: 45 minutes
-  3. Action Steps  :
-     a. Navigate to: Setup and Maintenance > Manage Subledger Accounting Options.
-     b. Select Application: Cost Management | Ledger: UK Primary Ledger.
-     c. Inspect Account Derivation Rule 'UK_ACC_RULE'.
-     d. Correct the cost organization mapping or item expense mapping for AS54888.
-     e. Run process "Create Accounting" with Mode: Final, Application: Cost Management.
-     f. Confirm TXN_COST_101 transitions to Accounting Status: ACCOUNTED.
-  4. Post-Fix Action: Retry Agent Close Request.
+  - Role Assigned : Subledger Accounting Specialist / ERP Systems Admin
+  - Navigation    : Setup and Maintenance > Manage Subledger Accounting Options
+  - Action Steps  : Correct account derivation rule 'UK_ACC_RULE' for item AS54888 / UK cost org. Run "Create Accounting".
 
 --------------------------------------------------------------------------------
 SCENARIO B-3: Unaccounted Payables (AP) Invoice
@@ -277,46 +339,41 @@ SCENARIO B-3: Unaccounted Payables (AP) Invoice
   GL Status     : Open (BLOCKED by AP)
   Verdict       : HOLD — Payables Subledger Blocker
 
-BLOCKING TRANSACTION:
-  Invoice Record ID : AP-INV-B301 (or synthetic TEST-AP-INV-001)
-  Supplier Name     : TEST-SUPPLIER-OMEGA
-  Module            : Payables (AP)
-  Accounting Status : NOT_ACCOUNTED
-  Transfer Status   : NOT_TRANSFERRED
-  Error Message     : "Invoice entered and validated but subledger journal was not created."
-
-TECHNICAL ROOT CAUSE:
-  Invoice was approved and matched to PO, but the background "Create Accounting" job
-  did not process this batch due to a processing cutoff threshold.
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [PASS — PO receipts clean]
+  2. Subledger Accounting: [PASS — Costing SLA generated]
+  3. Payables (AP): [FAIL — 1 BLOCKER FOUND]
+     - AP-INV-B301 (TEST-AP-INV-001) | Supplier: TEST-SUPPLIER-OMEGA | Amount: $18,400.00
+       Accounting Status: NOT_ACCOUNTED | Transfer Status: NOT_TRANSFERRED
+       Error: "Invoice entered and validated but subledger journal was not created."
+  4. Receivables (AR): [AUDITED — Clean]
+  5. Inventory Management: [AUDITED — Clean]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Payables Supervisor
-  2. Action Steps  :
-     a. Navigate to: Payables > Invoices > Accounting > Create Accounting.
-     b. Set Parameters: Ledger: US Primary Ledger, Period: Dec-24, Mode: Final.
-     c. Confirm accounting entries are generated without validation errors.
-     d. Run "Transfer Journal Entries to GL".
+  - Role Assigned : Payables Supervisor
+  - Action Steps  : Navigate to Payables > Accounting > Create Accounting. Run in Final mode for Period Dec-24.
 
 --------------------------------------------------------------------------------
 SCENARIO B-4: Payables Invoice Accounted but NOT Transferred to GL
 --------------------------------------------------------------------------------
   Period        : Dec-24
   Ledger ID     : 1001 (US Primary Ledger)
-  GL Status     : Open (BLOCKED)
+  GL Status     : Open (BLOCKED by AP GL Transfer)
   Verdict       : HOLD — Journal Transfer Gap
 
-BLOCKING TRANSACTION:
-  Invoice Record ID : AP-INV-B401 (or synthetic TEST-AP-INV-002)
-  Accounting Status : ACCOUNTED
-  Transfer Status   : NOT_TRANSFERRED
-  Error Message     : "Subledger journal created in AP but not transferred to GL open interface."
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [PASS]
+  2. Subledger Accounting: [PASS]
+  3. Payables (AP): [FAIL — 1 BLOCKER FOUND]
+     - AP-INV-B401 (TEST-AP-INV-002) | Supplier: TEST-SUPPLIER-OMEGA
+       Accounting Status: ACCOUNTED | Transfer Status: NOT_TRANSFERRED
+       Error: "Subledger journal exists in AP but not transferred to GL open interface."
+  4. Receivables (AR): [AUDITED — Clean]
+  5. Inventory Management: [AUDITED — Clean]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Payables Accountant / GL Analyst
-  2. Action Steps  :
-     a. Navigate to: Payables > Accounting > Transfer Journal Entries to GL.
-     b. Do NOT re-run Create Accounting (accounting already exists).
-     c. Submit transfer process and verify journal batch appears in GL.
+  - Role Assigned : Payables Accountant / GL Analyst
+  - Action Steps  : Submit "Transfer Journal Entries to GL" (Application: Payables). Do NOT re-run Create Accounting.
 
 --------------------------------------------------------------------------------
 SCENARIO B-5: Unaccounted Receivables (AR) Invoice
@@ -326,35 +383,41 @@ SCENARIO B-5: Unaccounted Receivables (AR) Invoice
   GL Status     : Open (BLOCKED by AR)
   Verdict       : HOLD — Receivables Subledger Blocker
 
-BLOCKING TRANSACTION:
-  Record ID         : AR-INV-B501 (or synthetic TEST-AR-INV-003)
-  Customer          : TEST-CUSTOMER-ALPHA
-  Accounting Status : NOT_ACCOUNTED
-  Transfer Status   : NOT_TRANSFERRED
-  Error Message     : "AR revenue transaction completed but accounting journal not created."
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [PASS]
+  2. Subledger Accounting: [PASS]
+  3. Payables (AP): [AUDITED — Clean]
+  4. Receivables (AR): [FAIL — 1 BLOCKER FOUND]
+     - AR-INV-B501 (TEST-AR-INV-003) | Customer: TEST-CUSTOMER-ALPHA
+       Accounting Status: NOT_ACCOUNTED | Transfer Status: NOT_TRANSFERRED
+       Error: "AR revenue transaction completed but accounting journal not created."
+  5. Inventory Management: [AUDITED — Clean]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Receivables Accounting Lead
-  2. Action Steps  :
-     a. Navigate to: Receivables > Billing > Accounting > Create Accounting.
-     b. Run process in Final mode for Period Dec-24.
+  - Role Assigned : Receivables Accounting Lead
+  - Action Steps  : Navigate to Receivables > Accounting > Create Accounting.
 
 --------------------------------------------------------------------------------
 SCENARIO B-6: Receivables Invoice Accounted but NOT Transferred to GL
 --------------------------------------------------------------------------------
   Period        : Dec-24
   Ledger ID     : 1001 (US Primary Ledger)
-  GL Status     : Open (BLOCKED)
+  GL Status     : Open (BLOCKED by AR GL Transfer)
   Verdict       : HOLD — AR Journal Transfer Gap
 
-BLOCKING TRANSACTION:
-  Record ID         : AR-INV-B601 (or synthetic TEST-AR-INV-004)
-  Accounting Status : ACCOUNTED
-  Transfer Status   : NOT_TRANSFERRED
-  Error Message     : "AR subledger journal created but not pushed to GL interface."
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [PASS]
+  2. Subledger Accounting: [PASS]
+  3. Payables (AP): [AUDITED — Clean]
+  4. Receivables (AR): [FAIL — 1 BLOCKER FOUND]
+     - AR-INV-B601 (TEST-AR-INV-004) | Customer: TEST-CUSTOMER-ALPHA
+       Accounting Status: ACCOUNTED | Transfer Status: NOT_TRANSFERRED
+       Error: "AR subledger journal created but not pushed to GL interface."
+  5. Inventory Management: [AUDITED — Clean]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Submit "Transfer Journal Entries to GL" with Application: Receivables.
+  - Role Assigned : Receivables Specialist
+  - Action Steps  : Submit "Transfer Journal Entries to GL" (Application: Receivables).
 
 --------------------------------------------------------------------------------
 SCENARIO B-7: Inventory Receipt NOT Transferred to Cost Management
@@ -364,21 +427,19 @@ SCENARIO B-7: Inventory Receipt NOT Transferred to Cost Management
   Costing Status: Open (BLOCKED)
   Verdict       : HOLD — Upstream Inventory Transfer Blocker
 
-BLOCKING TRANSACTION:
-  Record ID         : INV-RCT-B701 (or synthetic TEST-INV-RCT-005)
-  Organization      : TEST-ORG-M1
-  Item              : TEST-ITEM-XZ100
-  Transfer Status   : NOT_TRANSFERRED (to Cost Management)
-  Costing Status    : NOT_COSTED
-  Error Message     : "Inventory receipt approved but not picked up by Cost Management interface."
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [HOLD — Awaiting upstream inventory receipts]
+  2. Subledger Accounting: [HOLD]
+  3. Payables (AP): [AUDITED — Clean]
+  4. Receivables (AR): [AUDITED — Clean]
+  5. Inventory Management: [FAIL — 1 BLOCKER FOUND]
+     - INV-RCT-B701 (TEST-INV-RCT-005) | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100
+       Transfer Status: NOT_TRANSFERRED (to Cost Management) | Costing Status: NOT_COSTED
+       Error: "Inventory receipt approved but not picked up by Cost Management interface."
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Inventory Control Lead
-  2. Action Steps  :
-     a. Navigate to: Supply Chain Execution > Inventory Management > Tasks.
-     b. Select: "Transfer Transactions to Costing".
-     c. Submit process for Org: TEST-ORG-M1, Period: Dec-24.
-     d. Verify receipt arrives in Cost Accounting distributions before retrying close.
+  - Role Assigned : Inventory Control Lead
+  - Action Steps  : Run ESS Job "Transfer Transactions to Costing" for Org TEST-ORG-M1, Period Dec-24.
 
 --------------------------------------------------------------------------------
 SCENARIO B-8: Inventory Transferred to Cost Mgmt but NOT Yet Costed
@@ -388,20 +449,19 @@ SCENARIO B-8: Inventory Transferred to Cost Mgmt but NOT Yet Costed
   Costing Status: Open (BLOCKED)
   Verdict       : HOLD — Cost Processing Incomplete
 
-BLOCKING TRANSACTION:
-  Record ID         : INV-RCT-B801 (or synthetic TEST-INV-RCT-006)
-  Organization      : TEST-ORG-M1
-  Item              : TEST-ITEM-XZ100
-  Transfer Status   : TRANSFERRED
-  Costing Status    : NOT_COSTED
-  Error Message     : "Transaction visible in Cost Management but cost processor has not run."
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [FAIL — 1 BLOCKER FOUND]
+     - INV-RCT-B801 (TEST-INV-RCT-006) | Org: TEST-ORG-M1 | Item: TEST-ITEM-XZ100
+       Transfer Status: TRANSFERRED | Costing Status: NOT_COSTED
+       Error: "Transaction visible in Cost Management but cost processor has not run."
+  2. Subledger Accounting: [HOLD]
+  3. Payables (AP): [AUDITED — Clean]
+  4. Receivables (AR): [AUDITED — Clean]
+  5. Inventory Management: [PASS — Material transfer to CM complete]
 
 RUNBOOK REMEDIATION PLAYBOOK:
-  1. Role Assigned : Cost Accountant
-  2. Action Steps  :
-     a. Navigate to: Cost Management > Cost Accounting.
-     b. Submit ESS process: "Create Cost Accounting Distributions".
-     c. Confirm costing_status changes to COSTED.
+  - Role Assigned : Cost Accountant
+  - Action Steps  : Submit ESS Job "Create Cost Accounting Distributions". Confirm costing_status changes to COSTED.
 
 --------------------------------------------------------------------------------
 SCENARIO B-9: Multi-Module Cross-Hold (AP + Inventory in UK Ledger)
@@ -412,14 +472,23 @@ SCENARIO B-9: Multi-Module Cross-Hold (AP + Inventory in UK Ledger)
   GL Status     : Open (BLOCKED by Costing + AP)
   Verdict       : HOLD — Multi-Module Priority Resolution
 
-BLOCKING TRANSACTIONS:
-  1. INV-RCT-B901 | UK-PLANT-LON | UK-ITEM-005 | Transfer: TRANSFERRED | Costing: NOT_COSTED
-  2. AP-INV-B901  | UK-VENDOR-DELTA            | Accounting: NOT_ACCOUNTED | Transfer: NOT_TRANSFERRED
+COMPLETE 5-SUBLEDGER AUDIT:
+  1. Cost Management: [HOLD — Pending inventory costing completion]
+  2. Subledger Accounting: [HOLD — Blocked by unposted subledger journals]
+  3. Payables (AP): [FAIL — 1 BLOCKER]
+     - AP-INV-B901 | Supplier: UK-VENDOR-DELTA | Amount: £32,100.00
+       Accounting Status: NOT_ACCOUNTED | Transfer Status: NOT_TRANSFERRED
+       Description: AP invoice for UK logistics services; accounting not created.
+  4. Receivables (AR): [PASS — Clean / revenue posted]
+  5. Inventory Management: [FAIL — 1 BLOCKER]
+     - INV-RCT-B901 | Org: UK-PLANT-LON | Item: UK-ITEM-005 | Qty: 100 Ea
+       Transfer Status: TRANSFERRED | Costing Status: NOT_COSTED
+       Description: Item in Cost Management queue but not yet costed.
 
 PRIORITIZED RESOLUTION SEQUENCE:
-  Priority 1: Run Cost Accounting for UK-PLANT-LON -> Unblocks Costing Period.
-  Priority 2: Run Create Accounting & Transfer to GL for AP-INV-B901 -> Unblocks GL Period.
-  Priority 3: Re-submit Close Request to complete period closure.
+  Priority 1: Run Cost Accounting for UK-PLANT-LON (INV-RCT-B901) -> Unblocks Costing Period Close.
+  Priority 2: Run Create Accounting & Transfer to GL for AP-INV-B901 -> Unblocks GL Period Close.
+  Priority 3: Re-submit Close Request once all 5 subledgers pass audit.
 
 
 ================================================================================

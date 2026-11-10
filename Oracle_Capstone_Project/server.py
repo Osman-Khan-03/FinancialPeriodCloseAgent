@@ -188,7 +188,14 @@ class PeriodCloseRequestHandler(http.server.BaseHTTPRequestHandler):
             return self._serve_file(os.path.join(STATIC_DIR, "static", "app.js"), "application/javascript; charset=utf-8")
 
         # REST API Routes
-        if path == "/api/status":
+        if path == "/api/health":
+            return self._send_json(200, {
+                "status": "HEALTHY",
+                "service": "Oracle Financial Period Close Agent UI",
+                "version": "1.0.0"
+            })
+
+        elif path == "/api/status":
             period = query.get("period", ["Dec-24"])[0]
             client = get_active_client()
             agent = FinancialCloseAgent(client)
