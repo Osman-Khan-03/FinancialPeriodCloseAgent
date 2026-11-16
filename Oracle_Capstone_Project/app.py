@@ -124,7 +124,7 @@ def main_menu():
         elif choice == "6":
             print("\n[info] Running automated test suite for Costing purchase order receipt tests...")
             import unittest
-            suite = unittest.TestLoader().discover('.', pattern="test_*.py")
+            suite = unittest.TestLoader().discover('tests', pattern="test_*.py", top_level_dir=".")
             unittest.TextTestRunner(verbosity=2).run(suite)
             
         elif choice == "7":

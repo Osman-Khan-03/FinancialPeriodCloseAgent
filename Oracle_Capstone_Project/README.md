@@ -78,7 +78,7 @@ The Web UI is structured into 5 operational modules:
 
 ### 1. 💬 Agent Chat (IBM Consulting Advantage)
 - **Conversational AI Interaction**: Enter natural language instructions or paste structured prompt templates.
-- **1-Click Prompt Drawer**: Pre-loaded with all 9 scenario templates from [`agent_prompt_inputs.txt`](agent_prompt_inputs.txt).
+- **1-Click Prompt Drawer**: Pre-loaded with all 9 scenario templates from [`agent_prompt_inputs.txt`](docs/testing/agent_prompt_inputs.txt).
 - **Rich Diagnostic Output**: Real-time status badges (`READY`, `HOLD`, `COMPLETED`), formatted blocker callouts, and step-by-step resolution steps.
 
 ### 2. 📊 Period Close Cockpit / Dashboard
@@ -165,11 +165,12 @@ Oracle Fusion rejects any period close attempted out of order. The agent strictl
 | **`close_agent.py`** | Core `FinancialCloseAgent` orchestration engine and conversational prompt parser. |
 | **`oracle_fusion_client.py`** | Abstract client interface with `RealOracleFusionClient` and `MockOracleFusionClient` (the mock runs the real client's REST code against a local in-process Oracle REST simulator). |
 | **`mock_oracle_data/`** | Oracle Fusion REST-shaped JSON fixtures (`ledgers`, `ledgerPeriods`, `costTransactions`, `apInvoices`, `arTransactions`, `inventoryTransactions`) using Oracle attribute names (`LedgerId`, `PeriodName`, `ClosingStatus`, `TransferToGLStatus`, ...). |
-| **`mock_financial_period_close_data.txt`** | Comprehensive technical brief, 5-day close SOP runbook, and mock datasets. |
-| **`agent_prompt_inputs.txt`** | Ready-to-use prompt templates for 9 standard test scenarios. |
-| **`test_agent_walkthrough.txt`** | Step-by-step manual test guide mapping to all CLI and Web scenarios. |
-| **`test_period_close_8_case_pack.py`** | Automated unit tests covering the 8-case synthetic period close test pack. |
-| **`test_purchase_order_receipt.py`** | Unit tests for single purchase-order receipt costing hold and resolution. |
+| **`docs/reference/mock_financial_period_close_data.txt`** | Comprehensive technical brief, 5-day close SOP runbook, and mock datasets. |
+| **`docs/testing/agent_prompt_inputs.txt`** | Ready-to-use prompt templates for 9 standard test scenarios. |
+| **`docs/testing/test_agent_walkthrough.txt`** | Step-by-step manual test guide mapping to all CLI and Web scenarios. |
+| **`tests/test_period_close_8_case_pack.py`** | Automated unit tests covering the 8-case synthetic period close test pack. |
+| **`tests/test_purchase_order_receipt.py`** | Unit tests for single purchase-order receipt costing hold and resolution. |
+| **`docs/design/`** | Design and master documents (`.docx`). |
 | **`web/index.html`** | Single-page Web UI application template. |
 | **`web/static/style.css`** | IBM Carbon & Oracle Cloud styling design system. |
 | **`web/static/app.js`** | Frontend application logic, chat rendering, and API communication. |
@@ -189,10 +190,10 @@ python -m unittest discover -v
 
 ```bash
 # Run the 8-Case Period Close Test Pack (AP, AR, Inventory)
-python -m unittest test_period_close_8_case_pack.py
+python -m unittest tests.test_period_close_8_case_pack
 
 # Run the Single Purchase Order Receipt Costing Test
-python -m unittest test_purchase_order_receipt.py
+python -m unittest tests.test_purchase_order_receipt
 ```
 
 ### Expected Test Results:

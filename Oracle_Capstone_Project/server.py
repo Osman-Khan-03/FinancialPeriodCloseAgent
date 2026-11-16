@@ -416,7 +416,7 @@ class PeriodCloseRequestHandler(http.server.BaseHTTPRequestHandler):
         try:
             with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(log_stream):
                 loader = unittest.TestLoader()
-                suite = loader.discover(".", pattern="test_*.py")
+                suite = loader.discover("tests", pattern="test_*.py", top_level_dir=".")
                 runner = unittest.TextTestRunner(stream=log_stream, verbosity=2)
                 test_result = runner.run(suite)
 
