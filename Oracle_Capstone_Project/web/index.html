@@ -104,47 +104,26 @@
 
         <!-- MAIN BODY CONTENT AREA -->
         <main class="app-main-content">
-            <!-- TAB 1: AGENT CHAT (IBM CONSULTING ADVANTAGE) -->
+            <!-- TAB 1: CLOSE REQUEST FORM (IBM CONSULTING ADVANTAGE) -->
             <section id="tab-chat" class="tab-panel active">
                 <div class="chat-layout">
-                    <!-- CHAT SIDEBAR (TEMPLATES & PROMPTS) -->
+                    <!-- SIDEBAR: SCENARIO PROMPT TEMPLATES -->
                     <aside class="chat-sidebar">
                         <div class="sidebar-section-title">
                             <span class="icon">⚡</span>
                             <span>Consulting Advantage Prompts</span>
                         </div>
                         <p class="sidebar-help-text">
-                            Select a scenario template to load pre-configured agent prompts from <code>agent_prompt_inputs.txt</code>:
+                            Select a scenario to auto-fill the request form:
                         </p>
-
                         <div class="prompt-templates-list" id="prompt-templates-list">
                             <!-- Template items injected by JavaScript -->
                         </div>
-
-                        <div class="sidebar-divider"></div>
-
-                        <div class="sidebar-section-title">
-                            <span class="icon">🎯</span>
-                            <span>Quick Actions</span>
-                        </div>
-                        <div class="quick-action-buttons">
-                            <button class="btn-quick-chip" data-quick="Readiness Check for Dec-24 across all ledgers">
-                                🔍 Full Readiness Check (Dec-24)
-                            </button>
-                            <button class="btn-quick-chip" data-quick="Close Request for US Primary Ledger (1001) in Oct-24">
-                                🚀 Close Request (Oct-24 US)
-                            </button>
-                            <button class="btn-quick-chip" data-quick="Status Inquiry for period Dec-24">
-                                📊 Status Inquiry (Dec-24)
-                            </button>
-                            <button class="btn-quick-chip" data-quick="Are there any purchase order receipt costing errors in US Primary Ledger?">
-                                📦 Check PO Receipt Errors
-                            </button>
-                        </div>
                     </aside>
 
-                    <!-- CHAT CONVERSATION CONTAINER -->
+                    <!-- MAIN: CLOSE REQUEST FORM + RESULTS -->
                     <div class="chat-main-container">
+                        <!-- FORM HEADER -->
                         <div class="chat-conversation-header">
                             <div class="chat-agent-info">
                                 <div class="agent-avatar">
@@ -162,7 +141,7 @@
                                 </div>
                             </div>
                             <div class="chat-header-actions">
-                                <button id="btn-clear-chat" class="btn-secondary-sm" title="Clear Chat History">
+                                <button id="btn-clear-results" class="btn-secondary-sm" title="Clear Results">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="3 6 5 6 21 6"/>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -172,54 +151,82 @@
                             </div>
                         </div>
 
-                        <!-- CHAT MESSAGES SCROLL AREA -->
-                        <div class="chat-messages-scroll" id="chat-messages">
-                            <!-- Welcome / Greeting message -->
-                            <div class="chat-message agent-message">
-                                <div class="message-avatar">
-                                    <div class="avatar-circle">IBM</div>
-                                </div>
-                                <div class="message-content-wrapper">
-                                    <div class="message-author">IBM Consulting Advantage Agent</div>
-                                    <div class="message-body">
-                                        <p>👋 Hello! I am your <strong>Oracle Financial Period Close Agent</strong>.</p>
-                                        <p>I monitor and orchestrate period close readiness across Oracle Fusion Cloud Financials and Supply Chain Management (SCM Costing, SLA, Payables, Receivables, and Inventory).</p>
-                                        <div class="message-callout">
-                                            <strong>How I can help you today:</strong>
-                                            <ul>
-                                                <li><strong>Readiness Check:</strong> Deep multi-module scan for blocking transactions (PO costing, SLA rules, unaccounted invoices).</li>
-                                                <li><strong>Close Request:</strong> Autonomous pre-close validation and sequenced period closure (Costing first, then General Ledger).</li>
-                                                <li><strong>Status Inquiry:</strong> Real-time inspection of open/closed statuses across active ledgers.</li>
-                                            </ul>
-                                        </div>
-                                        <p>Select any prompt template on the left or type your instructions below to begin.</p>
+                        <!-- CLOSE REQUEST FORM PANEL -->
+                        <div class="close-request-form-panel">
+                            <form id="close-request-form" class="close-request-form">
+                                <div class="form-fields-grid">
+                                    <div class="crf-field">
+                                        <label class="crf-label" for="crf-environment">Environment</label>
+                                        <input type="text" id="crf-environment" class="crf-input"
+                                            value="Oracle Fusion Cloud Financials" readonly />
                                     </div>
-                                    <div class="message-timestamp">Ready</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- CHAT INPUT COMPOSER -->
-                        <div class="chat-composer-container">
-                            <form id="chat-form" class="chat-form">
-                                <div class="textarea-wrapper">
-                                    <textarea id="chat-input" placeholder="Type instructions or paste an IBM Consulting Advantage prompt (e.g. 'Run readiness check for Dec-24')..." rows="3"></textarea>
-                                </div>
-                                <div class="composer-toolbar">
-                                    <div class="composer-hints">
-                                        <span>Tip: Press <code>Enter</code> to send, <code>Shift+Enter</code> for new line</span>
+                                    <div class="crf-field">
+                                        <label class="crf-label" for="crf-ledger">Ledger</label>
+                                        <select id="crf-ledger" class="crf-input">
+                                            <option value="1001">US Primary Ledger (Ledger ID: 1001)</option>
+                                            <option value="1002">UK Primary Ledger (Ledger ID: 1002)</option>
+                                            <option value="1003">Canada Primary Ledger (Ledger ID: 1003)</option>
+                                            <option value="all">All Ledgers (Global Ledger Set)</option>
+                                        </select>
                                     </div>
-                                    <div class="composer-actions">
-                                        <button type="submit" id="btn-send-chat" class="btn-primary">
-                                            <span>Send Prompt</span>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <line x1="22" y1="2" x2="11" y2="13"/>
-                                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                                            </svg>
-                                        </button>
+                                    <div class="crf-field">
+                                        <label class="crf-label" for="crf-period">Period</label>
+                                        <select id="crf-period" class="crf-input">
+                                            <option value="Oct-24">Oct-24</option>
+                                            <option value="Nov-24">Nov-24</option>
+                                            <option value="Dec-24" selected>Dec-24</option>
+                                            <option value="Jan-25">Jan-25</option>
+                                        </select>
                                     </div>
+                                    <div class="crf-field">
+                                        <label class="crf-label" for="crf-action">Action</label>
+                                        <select id="crf-action" class="crf-input">
+                                            <option value="readiness">Readiness Check</option>
+                                            <option value="close" selected>Close Request</option>
+                                            <option value="status">Status Inquiry</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="crf-submit-row">
+                                    <button type="submit" id="btn-submit-close-request" class="btn-primary">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                        </svg>
+                                        <span>Run Agent</span>
+                                    </button>
+                                    <span class="crf-hint" id="crf-processing-hint" style="display:none;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon">
+                                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                        </svg>
+                                        Analyzing Oracle ledger status &amp; subledger distributions…
+                                    </span>
                                 </div>
                             </form>
+                        </div>
+
+                        <!-- SUBLEDGER RESULTS PANEL -->
+                        <div class="close-results-panel" id="close-results-panel" style="display:none;">
+                            <div class="results-header">
+                                <div class="results-title-group">
+                                    <h3 id="results-heading">Close Readiness Results</h3>
+                                    <span class="results-meta" id="results-meta-label"></span>
+                                </div>
+                                <div id="results-overall-badge" class="results-overall-badge"></div>
+                            </div>
+
+                            <!-- Per-ledger subledger chart tables -->
+                            <div id="results-ledgers-container"></div>
+                        </div>
+
+                        <!-- EMPTY / IDLE STATE -->
+                        <div class="close-idle-state" id="close-idle-state">
+                            <div class="idle-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8d8d8d" stroke-width="1.5">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                            <p class="idle-text">Fill in the form above and click <strong>Run Agent</strong>, or select a prompt template from the left panel to get started.</p>
                         </div>
                     </div>
                 </div>

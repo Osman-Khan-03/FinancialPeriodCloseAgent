@@ -28,12 +28,21 @@ document.addEventListener("DOMContentLoaded", () => {
         navBlockedBadge: document.getElementById("nav-blocked-badge"),
         blockerCountBadge: document.getElementById("blocker-count-badge"),
 
-        // Chat Tab
-        chatMessages: document.getElementById("chat-messages"),
-        chatForm: document.getElementById("chat-form"),
-        chatInput: document.getElementById("chat-input"),
-        btnSendChat: document.getElementById("btn-send-chat"),
-        btnClearChat: document.getElementById("btn-clear-chat"),
+        // Close Request Form Tab
+        closeRequestForm: document.getElementById("close-request-form"),
+        crfEnvironment: document.getElementById("crf-environment"),
+        crfLedger: document.getElementById("crf-ledger"),
+        crfPeriod: document.getElementById("crf-period"),
+        crfAction: document.getElementById("crf-action"),
+        btnSubmitCloseRequest: document.getElementById("btn-submit-close-request"),
+        btnClearResults: document.getElementById("btn-clear-results"),
+        crfProcessingHint: document.getElementById("crf-processing-hint"),
+        closeResultsPanel: document.getElementById("close-results-panel"),
+        closeIdleState: document.getElementById("close-idle-state"),
+        resultsHeading: document.getElementById("results-heading"),
+        resultsMetaLabel: document.getElementById("results-meta-label"),
+        resultsOverallBadge: document.getElementById("results-overall-badge"),
+        resultsLedgersContainer: document.getElementById("results-ledgers-container"),
         promptTemplatesList: document.getElementById("prompt-templates-list"),
 
         // Dashboard Tab
@@ -128,33 +137,15 @@ document.addEventListener("DOMContentLoaded", () => {
             refreshReadinessAssessment();
         });
 
-        // Chat Form
-        elements.chatForm.addEventListener("submit", (e) => {
+        // Close Request Form
+        elements.closeRequestForm.addEventListener("submit", (e) => {
             e.preventDefault();
-            sendChatMessage();
+            submitCloseRequest();
         });
 
-        elements.chatInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
-
-        elements.btnClearChat.addEventListener("click", () => {
-            elements.chatMessages.innerHTML = "";
-            appendAgentMessage(
-                "💬 Chat history cleared. How can I assist you with Oracle Financial Period Close?"
-            );
-        });
-
-        // Quick action chips in chat sidebar
-        document.querySelectorAll(".btn-quick-chip").forEach((chip) => {
-            chip.addEventListener("click", () => {
-                const promptText = chip.getAttribute("data-quick");
-                elements.chatInput.value = promptText;
-                sendChatMessage();
-            });
+        elements.btnClearResults.addEventListener("click", () => {
+            elements.closeResultsPanel.style.display = "none";
+            elements.closeIdleState.style.display = "flex";
         });
 
         // Dashboard Actions
@@ -252,9 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             if (data.status === "SUCCESS") {
                 await refreshReadinessAssessment();
-                appendAgentMessage(
-                    `🔄 **Switched active simulation scenario to:** \`${data.scenario_title || scenarioName}\`.\nReadiness assessments have been recomputed.`
-                );
+                console.info(`Scenario switched to: ${data.scenario_title || scenarioName}`);
             }
         } catch (err) {
             console.error("Error switching scenario:", err);
@@ -275,7 +264,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateBlockersHub(readiness);
 
                 if (showChatMessage) {
-                    appendAgentMessage(result.reply || "Readiness assessment completed.");
+                    // Switch to form tab and show results
+                    switchTab("tab-chat");
+                    renderCloseResults(readiness, state.period, "readiness", readiness.overall_ready ? "READY" : "BLOCKED");
                 }
             }
         } catch (err) {
@@ -284,128 +275,178 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function executeFinancialClose() {
+        // Pre-fill the form and run as a close request, then switch to it
         switchTab("tab-chat");
-        appendUserMessage(`Execute Financial Period Close for Period: ${state.period} across all active ledgers.`);
-
-        try {
-            const res = await fetch("/api/close", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ period: state.period }),
-            });
-            const result = await res.json();
-            appendAgentMessage(result.reply);
-            await refreshReadinessAssessment();
-        } catch (err) {
-            appendAgentMessage(`❌ Failed to execute period close: ${err.message}`);
-        }
+        if (elements.crfPeriod) elements.crfPeriod.value = state.period;
+        if (elements.crfAction) elements.crfAction.value = "close";
+        if (elements.crfLedger) elements.crfLedger.value = "all";
+        await submitCloseRequest();
     }
 
     // =========================================================================
-    // CHAT & CONSULTING ADVANTAGE INTERACTIONS
+    // CLOSE REQUEST FORM — SUBMISSION & RESULTS RENDERING
     // =========================================================================
 
-    async function sendChatMessage() {
-        const text = elements.chatInput.value.trim();
-        if (!text || state.isProcessing) return;
-
+    async function submitCloseRequest() {
+        if (state.isProcessing) return;
         state.isProcessing = true;
-        elements.chatInput.value = "";
-        appendUserMessage(text);
 
-        // Show typing indicator
-        const typingEl = appendTypingIndicator();
+        const ledgerVal = elements.crfLedger.value;
+        const period    = elements.crfPeriod.value;
+        const action    = elements.crfAction.value;
+        const ledgerId  = ledgerVal === "all" ? null : ledgerVal;
+
+        // Keep global period in sync
+        state.period = period;
+
+        // Show processing hint, hide results
+        elements.crfProcessingHint.style.display = "inline-flex";
+        elements.btnSubmitCloseRequest.disabled = true;
+        elements.closeResultsPanel.style.display = "none";
+        elements.closeIdleState.style.display = "none";
 
         try {
-            const res = await fetch("/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: text,
-                    period: state.period,
-                    scenario: state.scenario,
-                }),
-            });
-            const data = await res.json();
-            typingEl.remove();
-
-            if (data && data.reply) {
-                appendAgentMessage(data.reply);
-                if (data.data) {
-                    // Update dashboard if readiness or close was triggered
-                    if (data.action === "readiness_assessment" || data.action === "close_blocked") {
-                        updateDashboard(data.data);
-                        updateBlockersHub(data.data);
-                    }
+            let data;
+            if (action === "close") {
+                const res = await fetch("/api/close", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ period, ledger_id: ledgerId }),
+                });
+                data = await res.json();
+                // /api/close returns { reply, data: close_result } — we re-fetch readiness for the subledger table
+                const rdRes = await fetch("/api/assessment", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ period, ledger_id: ledgerId }),
+                });
+                const rdData = await rdRes.json();
+                if (rdData.status === "SUCCESS") {
+                    renderCloseResults(rdData.data, period, action, data.overall_status || (rdData.data.overall_ready ? "COMPLETED" : "BLOCKED"));
+                    updateDashboard(rdData.data);
+                    updateBlockersHub(rdData.data);
                 }
             } else {
-                appendAgentMessage("⚠️ Received empty response from Period Close Agent.");
+                // Readiness check or Status Inquiry — use /api/assessment
+                const res = await fetch("/api/assessment", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ period, ledger_id: ledgerId }),
+                });
+                data = await res.json();
+                if (data.status === "SUCCESS") {
+                    renderCloseResults(data.data, period, action, data.data.overall_ready ? "READY" : "BLOCKED");
+                    updateDashboard(data.data);
+                    updateBlockersHub(data.data);
+                }
             }
         } catch (err) {
-            typingEl.remove();
-            appendAgentMessage(`❌ Error communicating with Period Close Agent: ${err.message}`);
+            elements.closeIdleState.style.display = "flex";
+            elements.closeIdleState.querySelector(".idle-text").textContent =
+                "❌ Error communicating with Period Close Agent: " + err.message;
         } finally {
+            elements.crfProcessingHint.style.display = "none";
+            elements.btnSubmitCloseRequest.disabled = false;
             state.isProcessing = false;
         }
     }
 
-    function appendUserMessage(text) {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = "chat-message user-message";
-        msgDiv.innerHTML = `
-            <div class="message-avatar">
-                <div class="avatar-circle user">You</div>
-            </div>
-            <div class="message-content-wrapper">
-                <div class="message-author">Consulting User</div>
-                <div class="message-body">${escapeHtml(text)}</div>
-                <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
-            </div>
-        `;
-        elements.chatMessages.appendChild(msgDiv);
-        scrollToBottom();
-    }
+    function renderCloseResults(readiness, period, action, overallStatus) {
+        const report = readiness.ledgers_report || {};
+        const isReady = readiness.overall_ready;
+        const totalBlockers = readiness.total_blockers || 0;
 
-    function appendAgentMessage(markdownText) {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = "chat-message agent-message";
-        const formattedHtml = renderSimpleMarkdown(markdownText);
+        // Heading
+        const actionLabels = { readiness: "Readiness Check", close: "Close Request", status: "Status Inquiry" };
+        elements.resultsHeading.textContent = `${actionLabels[action] || "Results"} — ${period}`;
+        elements.resultsMetaLabel.textContent =
+            `${Object.keys(report).length} ledger(s) assessed • ${totalBlockers} blocker(s) found`;
 
-        msgDiv.innerHTML = `
-            <div class="message-avatar">
-                <div class="avatar-circle">IBM</div>
-            </div>
-            <div class="message-content-wrapper">
-                <div class="message-author">IBM Consulting Advantage Agent</div>
-                <div class="message-body">${formattedHtml}</div>
-                <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
-            </div>
-        `;
-        elements.chatMessages.appendChild(msgDiv);
-        scrollToBottom();
-    }
+        // Overall badge
+        let badgeHtml;
+        if (overallStatus === "COMPLETED") {
+            badgeHtml = `<span class="results-badge results-badge-success">✓ CLOSED</span>`;
+        } else if (isReady || overallStatus === "READY") {
+            badgeHtml = `<span class="results-badge results-badge-success">✓ READY</span>`;
+        } else {
+            badgeHtml = `<span class="results-badge results-badge-blocked">✗ BLOCKED</span>`;
+        }
+        elements.resultsOverallBadge.innerHTML = badgeHtml;
 
-    function appendTypingIndicator() {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = "chat-message agent-message";
-        msgDiv.innerHTML = `
-            <div class="message-avatar">
-                <div class="avatar-circle">IBM</div>
-            </div>
-            <div class="message-content-wrapper">
-                <div class="message-author">IBM Consulting Advantage Agent</div>
-                <div class="message-body">
-                    <span style="font-style: italic; color: #525252;">Analyzing Oracle ledger status & subledger distributions...</span>
+        // Per-ledger subledger tables
+        elements.resultsLedgersContainer.innerHTML = "";
+
+        const MODULES = [
+            { key: "costing",   label: "Cost Management" },
+            { key: "sla",       label: "Subledger SLA" },
+            { key: "ap",        label: "Payables (AP)" },
+            { key: "ar",        label: "Receivables (AR)" },
+            { key: "inventory", label: "Inventory" },
+        ];
+
+        Object.entries(report).forEach(([ledgerName, ldata]) => {
+            const checks = ldata.module_checks || {};
+            const ledgerReady = ldata.readiness_status === "READY";
+
+            const ledgerBlock = document.createElement("div");
+            ledgerBlock.className = "results-ledger-block";
+
+            // Build rows for each subledger module
+            const rows = MODULES.map((mod) => {
+                const check = checks[mod.key] || { status: "PASS", blockers: [] };
+                const canClose = check.status === "PASS";
+
+                // Collect reasons from blockers
+                let reason = "No blockers";
+                if (!canClose && check.blockers && check.blockers.length > 0) {
+                    reason = check.blockers.map(b => b.error_message || b.description || "Blocker found").join("; ");
+                }
+
+                return `
+                    <tr class="results-row ${canClose ? "row-pass" : "row-fail"}">
+                        <td class="results-module-cell">${escapeHtml(mod.label)}</td>
+                        <td class="results-status-cell">
+                            ${canClose
+                                ? `<span class="result-icon result-pass" title="Can be closed">✓</span>`
+                                : `<span class="result-icon result-fail" title="Blocked">✗</span>`}
+                        </td>
+                        <td class="results-reason-cell ${canClose ? "reason-clear" : "reason-blocked"}">
+                            ${canClose ? "No blockers" : escapeHtml(reason)}
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+
+            const ledgerStatusClass = ledgerReady ? "ledger-block-ready" : "ledger-block-blocked";
+            const ledgerStatusIcon  = ledgerReady ? "✓" : "✗";
+            const ledgerStatusText  = ledgerReady ? "Ready to Close" : "Blocked";
+
+            ledgerBlock.innerHTML = `
+                <div class="results-ledger-header ${ledgerStatusClass}">
+                    <span class="results-ledger-title">${escapeHtml(ledgerName)}</span>
+                    <span class="results-ledger-id">ID: ${ldata.ledger_id} | ${ldata.currency}</span>
+                    <span class="results-ledger-status">
+                        <span class="result-icon ${ledgerReady ? "result-pass" : "result-fail"}">${ledgerStatusIcon}</span>
+                        ${ledgerStatusText}
+                    </span>
                 </div>
-            </div>
-        `;
-        elements.chatMessages.appendChild(msgDiv);
-        scrollToBottom();
-        return msgDiv;
-    }
+                <table class="results-subledger-table">
+                    <thead>
+                        <tr>
+                            <th>Subledger / Module</th>
+                            <th>Can Close?</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
 
-    function scrollToBottom() {
-        elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+            elements.resultsLedgersContainer.appendChild(ledgerBlock);
+        });
+
+        elements.closeIdleState.style.display = "none";
+        elements.closeResultsPanel.style.display = "block";
     }
 
     // =========================================================================
@@ -438,8 +479,37 @@ document.addEventListener("DOMContentLoaded", () => {
             card.addEventListener("click", () => {
                 document.querySelectorAll(".prompt-template-card").forEach((c) => c.classList.remove("active"));
                 card.classList.add("active");
-                elements.chatInput.value = t.prompt;
-                elements.chatInput.focus();
+
+                // Parse the prompt text and fill the form fields
+                const prompt = t.prompt || "";
+
+                // Extract Period (e.g. "Oct-24", "Nov-24", "Dec-24", "Jan-25")
+                const periodMatch = prompt.match(/Period\s*:\s*([A-Za-z]{3}-\d{2})/i);
+                if (periodMatch) {
+                    const p = periodMatch[1];
+                    const opt = elements.crfPeriod.querySelector(`option[value="${p}"]`);
+                    if (opt) elements.crfPeriod.value = p;
+                }
+
+                // Extract Ledger ID (1001 / 1002 / 1003) or multi-ledger
+                if (/1003/.test(prompt)) {
+                    elements.crfLedger.value = "1003";
+                } else if (/1002/.test(prompt)) {
+                    elements.crfLedger.value = "1002";
+                } else if (/1001/.test(prompt)) {
+                    elements.crfLedger.value = "1001";
+                } else if (/global ledger set|all three|all ledgers/i.test(prompt)) {
+                    elements.crfLedger.value = "all";
+                }
+
+                // Extract Action
+                if (/close request/i.test(prompt)) {
+                    elements.crfAction.value = "close";
+                } else if (/readiness check|readiness assessment/i.test(prompt)) {
+                    elements.crfAction.value = "readiness";
+                } else if (/status inquiry/i.test(prompt)) {
+                    elements.crfAction.value = "status";
+                }
             });
             elements.promptTemplatesList.appendChild(card);
         });
