@@ -163,7 +163,8 @@ Oracle Fusion rejects any period close attempted out of order. The agent strictl
 | **`server.py`** | Web server and REST API backend (`http.server`) binding to `127.0.0.1:8000`. |
 | **`app.py`** | Interactive CLI console and entry point for launching both CLI and Web UI (`--ui`). |
 | **`close_agent.py`** | Core `FinancialCloseAgent` orchestration engine and conversational prompt parser. |
-| **`oracle_fusion_client.py`** | Abstract client interface with `MockOracleFusionClient` and `RealOracleFusionClient`. |
+| **`oracle_fusion_client.py`** | Abstract client interface with `RealOracleFusionClient` and `MockOracleFusionClient` (the mock runs the real client's REST code against a local in-process Oracle REST simulator). |
+| **`mock_oracle_data/`** | Oracle Fusion REST-shaped JSON fixtures (`ledgers`, `ledgerPeriods`, `costTransactions`, `apInvoices`, `arTransactions`, `inventoryTransactions`) using Oracle attribute names (`LedgerId`, `PeriodName`, `ClosingStatus`, `TransferToGLStatus`, ...). |
 | **`mock_financial_period_close_data.txt`** | Comprehensive technical brief, 5-day close SOP runbook, and mock datasets. |
 | **`agent_prompt_inputs.txt`** | Ready-to-use prompt templates for 9 standard test scenarios. |
 | **`test_agent_walkthrough.txt`** | Step-by-step manual test guide mapping to all CLI and Web scenarios. |

@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "LedgerId": 1001,
+      "Name": "US Primary Ledger",
+      "Description": "US Primary Ledger",
+      "CurrencyCode": "USD",
+      "ChartOfAccountsName": "US_CORP_COA",
+      "PeriodSetName": "US_CORP_CAL",
+      "AccountedPeriodType": "Month",
+      "LedgerCategoryCode": "PRIMARY",
+      "LedgerTypeCode": "P",
+      "EnabledFlag": true
+    },
+    {
+      "LedgerId": 1002,
+      "Name": "UK Primary Ledger",
+      "Description": "UK Primary Ledger",
+      "CurrencyCode": "GBP",
+      "ChartOfAccountsName": "UK_CORP_COA",
+      "PeriodSetName": "UK_CORP_CAL",
+      "AccountedPeriodType": "Month",
+      "LedgerCategoryCode": "PRIMARY",
+      "LedgerTypeCode": "P",
+      "EnabledFlag": true
+    },
+    {
+      "LedgerId": 1003,
+      "Name": "Canada Primary Ledger",
+      "Description": "Canada Primary Ledger",
+      "CurrencyCode": "CAD",
+      "ChartOfAccountsName": "CA_CORP_COA",
+      "PeriodSetName": "CA_CORP_CAL",
+      "AccountedPeriodType": "Month",
+      "LedgerCategoryCode": "PRIMARY",
+      "LedgerTypeCode": "P",
+      "EnabledFlag": true
+    }
+  ]
+}

@@ -1,10 +1,17 @@
+import copy
 import json
 import logging
-from abc import ABC, abstractmethod
-import urllib.request
+import os
+import re
 import urllib.error
+import urllib.parse
+import urllib.request
+from abc import ABC, abstractmethod
 
 logger = logging.getLogger("OracleFusionClient")
+
+REST_ROOT = "/fscmRestApp/resources/11.13.18.05"
+
 
 class OracleFusionClient(ABC):
     """
@@ -62,9 +69,15 @@ class OracleFusionClient(ABC):
 
 class RealOracleFusionClient(OracleFusionClient):
     """
-    Real Oracle Fusion Cloud client connecting to the ERP REST APIs.
+    Oracle Fusion Cloud client connecting to the ERP REST APIs.
     Uses standard library urllib for security and dependency-free stability.
+
+    Oracle returns collections as {"items": [...], "count", "hasMore", "limit", "offset"}
+    with Oracle-style PascalCase attributes. This class pages through those collections
+    and normalises each item to the snake_case shape consumed by the close agent.
     """
+    PAGE_SIZE = 100
+
     def __init__(self, base_url: str, username: str, password_token: str):
         self.base_url = base_url.rstrip("/")
         self.username = username
@@ -79,14 +92,25 @@ class RealOracleFusionClient(OracleFusionClient):
             "Accept": "application/json"
         }
 
+    # ------------------------------------------------------------------ #
+    # HTTP layer                                                          #
+    # ------------------------------------------------------------------ #
+    def _build_url(self, endpoint: str) -> str:
+        """Percent-encode the query string (q= filters contain spaces and quotes)."""
+        path, sep, query = endpoint.partition("?")
+        if sep:
+            query = urllib.parse.quote(query, safe="=&'()!")
+            return f"{self.base_url}/{path}?{query}"
+        return f"{self.base_url}/{path}"
+
     def _make_request(self, endpoint: str, method: str = "GET", data: dict = None) -> dict:
-        url = f"{self.base_url}/{endpoint}"
+        url = self._build_url(endpoint)
         logger.debug(f"Making {method} request to {url}")
-        
+
         req_data = None
         if data:
             req_data = json.dumps(data).encode("utf-8")
-            
+
         req = urllib.request.Request(url, data=req_data, headers=self.headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=15) as response:
@@ -99,39 +123,135 @@ class RealOracleFusionClient(OracleFusionClient):
             logger.error(f"Request failed: {str(e)}")
             raise Exception(f"Connection to Oracle Fusion failed: {str(e)}")
 
+    def _get_items(self, endpoint: str) -> list:
+        """GET a collection resource, following Oracle's limit/offset/hasMore paging."""
+        items = []
+        offset = 0
+        while True:
+            sep = "&" if "?" in endpoint else "?"
+            page = self._make_request(f"{endpoint}{sep}limit={self.PAGE_SIZE}&offset={offset}")
+            batch = page.get("items", [])
+            items.extend(batch)
+            if not page.get("hasMore") or not batch:
+                return items
+            offset += len(batch)
+
+    # ------------------------------------------------------------------ #
+    # Oracle item -> agent record normalisation                           #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _norm_ledger(i: dict) -> dict:
+        return {
+            "ledger_id": str(i.get("LedgerId")),
+            "name": i.get("Name"),
+            "currency": i.get("CurrencyCode"),
+            "chart_of_accounts": i.get("ChartOfAccountsName"),
+        }
+
+    @staticmethod
+    def _norm_costing(i: dict) -> dict:
+        return {
+            "transaction_id": i.get("CostTransactionNumber"),
+            "po_number": i.get("PurchaseOrderNumber"),
+            "receipt_number": i.get("ReceiptNumber"),
+            "item_number": i.get("ItemNumber"),
+            "quantity": i.get("Quantity"),
+            "unit_of_measure": i.get("UnitOfMeasure"),
+            "costing_status": i.get("CostingStatus"),
+            "accounting_status": i.get("AccountingStatus"),
+            "error_message": i.get("ErrorMessage"),
+        }
+
+    @staticmethod
+    def _subledger_next_step(accounting_status: str, transfer_status: str, noun: str):
+        if accounting_status != "ACCOUNTED":
+            return f"Run Create Accounting for this {noun} (accounting not yet created)."
+        if transfer_status != "TRANSFERRED":
+            return f"Run Transfer Journal Entries to GL for this {noun}."
+        return None
+
+    @classmethod
+    def _norm_ap(cls, i: dict) -> dict:
+        acct, xfer = i.get("AccountingStatus"), i.get("TransferToGLStatus")
+        return {
+            "record_id": i.get("InvoiceNumber"),
+            "module": "Payables",
+            "period": i.get("PeriodName"),
+            "supplier": i.get("Supplier"),
+            "description": i.get("Description"),
+            "accounting_status": acct,
+            "transfer_status": xfer,
+            "next_step": cls._subledger_next_step(acct, xfer, "invoice"),
+        }
+
+    @classmethod
+    def _norm_ar(cls, i: dict) -> dict:
+        acct, xfer = i.get("AccountingStatus"), i.get("TransferToGLStatus")
+        return {
+            "record_id": i.get("TransactionNumber"),
+            "module": "Receivables",
+            "period": i.get("PeriodName"),
+            "customer": i.get("BillToCustomerName"),
+            "description": i.get("Description"),
+            "accounting_status": acct,
+            "transfer_status": xfer,
+            "next_step": cls._subledger_next_step(acct, xfer, "transaction"),
+        }
+
+    @staticmethod
+    def _norm_inventory(i: dict) -> dict:
+        xfer, costing = i.get("TransferToCostMgmtStatus"), i.get("CostingStatus")
+        if xfer != "TRANSFERRED":
+            next_step = ("Transfer inventory transaction to Cost Management "
+                         "(cost processor has not yet picked up this receipt).")
+        elif costing == "NOT_COSTED":
+            next_step = ("Cost this transaction in Cost Management "
+                         "(transferred but cost processor has not completed costing).")
+        else:
+            next_step = None
+        return {
+            "record_id": i.get("TransactionNumber"),
+            "module": "Inventory / Cost Management",
+            "period": i.get("PeriodName"),
+            "organization": i.get("OrganizationCode"),
+            "item": i.get("ItemNumber"),
+            "description": i.get("Description"),
+            "transfer_status": xfer,
+            "costing_status": costing,
+            "next_step": next_step,
+        }
+
+    # ------------------------------------------------------------------ #
+    # OracleFusionClient interface                                        #
+    # ------------------------------------------------------------------ #
     def get_ledgers(self):
-        # Oracle standard Ledger REST endpoint
         # GET /fscmRestApp/resources/11.13.18.05/ledgers
         endpoint = "fscmRestApp/resources/11.13.18.05/ledgers?onlyData=true"
-        response = self._make_request(endpoint)
-        return response.get("items", [])
+        return [self._norm_ledger(i) for i in self._get_items(endpoint)]
 
     def get_period_statuses(self, ledger_id: str, period_name: str):
-        # Standard General Ledger and Subledger period status endpoint
         # For General Ledger (ApplicationId 101)
         gl_endpoint = f"fscmRestApp/resources/11.13.18.05/ledgerPeriods?q=LedgerId={ledger_id} and PeriodName='{period_name}' and ApplicationId=101&onlyData=true"
         # For Costing (ApplicationId 10078 / Cost Management)
         cost_endpoint = f"fscmRestApp/resources/11.13.18.05/ledgerPeriods?q=LedgerId={ledger_id} and PeriodName='{period_name}' and ApplicationId=10078&onlyData=true"
-        
+
         gl_status = "Never Opened"
         cost_status = "Never Opened"
-        
+
         try:
-            gl_resp = self._make_request(gl_endpoint)
-            items = gl_resp.get("items", [])
+            items = self._get_items(gl_endpoint)
             if items:
                 gl_status = items[0].get("ClosingStatus", "Open")
         except Exception as e:
             logger.warning(f"Could not fetch GL period status: {e}")
-            
+
         try:
-            cost_resp = self._make_request(cost_endpoint)
-            items = cost_resp.get("items", [])
+            items = self._get_items(cost_endpoint)
             if items:
                 cost_status = items[0].get("ClosingStatus", "Open")
         except Exception as e:
             logger.warning(f"Could not fetch Costing period status: {e}")
-            
+
         return {
             "GL": gl_status,
             "COST": cost_status
@@ -139,18 +259,16 @@ class RealOracleFusionClient(OracleFusionClient):
 
     def get_costing_transactions(self, ledger_id: str, period_name: str):
         # Queries Costing transactions (subledger) that are unprocessed or have costing/accounting errors
-        # REST API endpoint for cost distributions/transactions
         endpoint = f"fscmRestApp/resources/11.13.18.05/costTransactions?q=LedgerId={ledger_id} and PeriodName='{period_name}' and (CostingStatus='ERROR' or AccountingStatus='ERROR' or CostingStatus='UNPROCESSED' or AccountingStatus='NOT_ACCOUNTED')&onlyData=true"
         try:
-            response = self._make_request(endpoint)
-            return response.get("items", [])
+            return [self._norm_costing(i) for i in self._get_items(endpoint)]
         except Exception as e:
             logger.error(f"Failed to query costing transactions: {e}")
             return []
 
     def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
         app_id = 101 if application == "GL" else 10078
-        endpoint = f"fscmRestApp/resources/11.13.18.05/ledgerPeriods"
+        endpoint = "fscmRestApp/resources/11.13.18.05/ledgerPeriods"
 
         payload = {
             "LedgerId": int(ledger_id),
@@ -176,8 +294,7 @@ class RealOracleFusionClient(OracleFusionClient):
             f"&onlyData=true"
         )
         try:
-            response = self._make_request(ap_endpoint)
-            return response.get("items", [])
+            return [self._norm_ap(i) for i in self._get_items(ap_endpoint)]
         except Exception as e:
             logger.error(f"Failed to query AP transactions: {e}")
             return []
@@ -191,8 +308,7 @@ class RealOracleFusionClient(OracleFusionClient):
             f"&onlyData=true"
         )
         try:
-            response = self._make_request(ar_endpoint)
-            return response.get("items", [])
+            return [self._norm_ar(i) for i in self._get_items(ar_endpoint)]
         except Exception as e:
             logger.error(f"Failed to query AR transactions: {e}")
             return []
@@ -206,740 +322,242 @@ class RealOracleFusionClient(OracleFusionClient):
             f"&onlyData=true"
         )
         try:
-            response = self._make_request(inv_endpoint)
-            return response.get("items", [])
+            return [self._norm_inventory(i) for i in self._get_items(inv_endpoint)]
         except Exception as e:
             logger.error(f"Failed to query inventory transactions: {e}")
             return []
 
 
-class MockOracleFusionClient(OracleFusionClient):
+# ---------------------------------------------------------------------- #
+# Mock Oracle Fusion REST server (transport-level)                        #
+# ---------------------------------------------------------------------- #
+MOCK_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock_oracle_data")
+MOCK_RESOURCES = (
+    "ledgers", "ledgerPeriods", "costTransactions",
+    "apInvoices", "arTransactions", "inventoryTransactions",
+)
+
+_TOKEN_RE = re.compile(
+    r"\s*(?:(?P<lp>\()|(?P<rp>\))|(?P<ne>!=)|(?P<eq>=)"
+    r"|'(?P<str>(?:[^']|'')*)'|(?P<num>-?\d+(?:\.\d+)?)|(?P<word>[A-Za-z_][A-Za-z0-9_]*))"
+)
+
+
+class _MockHttpError(Exception):
+    def __init__(self, code: int, title: str):
+        super().__init__(title)
+        self.code = code
+        self.title = title
+
+
+def _tokenize_filter(q: str) -> list:
+    tokens, pos = [], 0
+    while pos < len(q):
+        if not q[pos:].strip():
+            break
+        m = _TOKEN_RE.match(q, pos)
+        if not m:
+            raise _MockHttpError(400, f"Invalid q filter near: {q[pos:pos + 20]!r}")
+        pos = m.end()
+        kind = m.lastgroup
+        if kind == "str":
+            tokens.append(("lit", m.group("str").replace("''", "'")))
+        elif kind == "num":
+            text = m.group("num")
+            tokens.append(("lit", float(text) if "." in text else int(text)))
+        elif kind == "word":
+            word = m.group("word")
+            if word.lower() in ("and", "or"):
+                tokens.append((word.lower(), None))
+            else:
+                tokens.append(("field", word))
+        else:
+            tokens.append((kind, None))
+    return tokens
+
+
+def _parse_filter(q: str):
+    """Parse an Oracle REST q= filter (=, !=, and, or, parentheses) into a predicate."""
+    tokens = _tokenize_filter(q)
+    idx = 0
+
+    def peek():
+        return tokens[idx][0] if idx < len(tokens) else None
+
+    def take(kind):
+        nonlocal idx
+        if peek() != kind:
+            raise _MockHttpError(400, "Invalid q filter syntax")
+        tok = tokens[idx]
+        idx += 1
+        return tok[1]
+
+    def parse_or():
+        left = parse_and()
+        while peek() == "or":
+            take("or")
+            right = parse_and()
+            left = (lambda a, b: lambda row: a(row) or b(row))(left, right)
+        return left
+
+    def parse_and():
+        left = parse_term()
+        while peek() == "and":
+            take("and")
+            right = parse_term()
+            left = (lambda a, b: lambda row: a(row) and b(row))(left, right)
+        return left
+
+    def parse_term():
+        if peek() == "lp":
+            take("lp")
+            inner = parse_or()
+            take("rp")
+            return inner
+        field = take("field")
+        op = "eq" if peek() == "eq" else "ne"
+        take(op)
+        value = take("lit")
+
+        def predicate(row):
+            if field not in row:
+                raise _MockHttpError(400, f"Unknown attribute in q filter: {field}")
+            equal = row[field] == value
+            return equal if op == "eq" else not equal
+        return predicate
+
+    if not tokens:
+        return lambda row: True
+    predicate = parse_or()
+    if idx != len(tokens):
+        raise _MockHttpError(400, "Invalid q filter syntax")
+    return predicate
+
+
+class MockOracleFusionClient(RealOracleFusionClient):
     """
-    Mock Oracle Fusion client that simulates a real ERP environment.
-    Contains complex realistic scenarios, specifically highlighting purchase order receipts in costing.
-    Also contains an 8-case test-pack dataset covering AP, AR and Inventory unaccounted /
-    not-transferred / not-costed states for period-close validation testing.
+    Mock Oracle Fusion environment. It reuses RealOracleFusionClient unchanged (URL
+    building, q= filters, limit/offset paging, item normalisation) and only replaces
+    the HTTP transport with an in-process server that answers from Oracle-shaped JSON
+    fixtures in ./mock_oracle_data ({"items": [...], "count", "hasMore", "limit",
+    "offset"}). The fixtures contain Oracle attributes (LedgerId, PeriodName,
+    ClosingStatus, CostingStatus, TransferToGLStatus, ...), exactly as REST returns them.
+
+    Scenarios (Dec-24 costing data): "default", "all_clear",
+    "po_costing_hold_only", "unaccounted_hold_only".
     """
+    DEFAULT_LIMIT = 25
+
     def __init__(self, scenario_name: str = "default"):
+        # Intentionally no super().__init__(): no credentials are needed for the mock.
+        self.base_url = "https://mock-oracle-fusion.invalid"
+        self.headers = {}
         self.scenario_name = scenario_name
-        self._init_mock_data()
+        self._load_fixtures()
+        self._apply_scenario()
 
-    def _init_mock_data(self):
-        # 1. Ledgers list
-        self.ledgers = [
-            {"ledger_id": "1001", "name": "US Primary Ledger", "currency": "USD", "chart_of_accounts": "US_COA"},
-            {"ledger_id": "1002", "name": "UK Primary Ledger", "currency": "GBP", "chart_of_accounts": "UK_COA"},
-            {"ledger_id": "1003", "name": "Canada Primary Ledger", "currency": "CAD", "chart_of_accounts": "CA_COA"}
-        ]
+    def _load_fixtures(self):
+        self._store = {}
+        for name in MOCK_RESOURCES:
+            with open(os.path.join(MOCK_DATA_DIR, f"{name}.json"), "r", encoding="utf-8") as f:
+                self._store[name] = copy.deepcopy(json.load(f)["items"])
 
-        # 2. Period Statuses (GL & COST) across periods
-        self.period_statuses = {
-            "Oct-24": {
-                "1001": {"GL": "Open", "COST": "Open"},
-                "1002": {"GL": "Open", "COST": "Open"},
-                "1003": {"GL": "Open", "COST": "Open"}
-            },
-            "Nov-24": {
-                "1001": {"GL": "Open", "COST": "Open"},
-                "1002": {"GL": "Open", "COST": "Open"},
-                "1003": {"GL": "Open", "COST": "Open"}
-            },
-            "Dec-24": {
-                "1001": {"GL": "Open", "COST": "Open"},
-                "1002": {"GL": "Open", "COST": "Open"},
-                "1003": {"GL": "Open", "COST": "Open"}
-            },
-            "Jan-25": {
-                "1001": {"GL": "Open", "COST": "Open"},
-                "1002": {"GL": "Open", "COST": "Open"},
-                "1003": {"GL": "Open", "COST": "Open"}
-            }
+    def _apply_scenario(self):
+        cost = {
+            i["CostTransactionNumber"]: i
+            for i in self._store["costTransactions"] if i["PeriodName"] == "Dec-24"
         }
 
-        # 3. Costing / PO Receipt Transactions across periods & ledgers
-        self.transactions = {
-            "Dec-24": {
-                "1001": [
-                    {
-                        "transaction_id": "TXN_COST_001",
-                        "po_number": "PO-2024-001",
-                        "receipt_number": "RC-99011",
-                        "item_number": "AS54888",
-                        "quantity": 100,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    },
-                    {
-                        "transaction_id": "TXN_COST_002",
-                        "po_number": "PO-2024-002",
-                        "receipt_number": "RC-99012",
-                        "item_number": "CN-90812",
-                        "quantity": 50,
-                        "unit_of_measure": "Box",
-                        "costing_status": "ERROR",
-                        "accounting_status": "NOT_ACCOUNTED",
-                        "error_message": "Item cost definition is missing for item 'CN-90812' in US Cost Book."
-                    }
-                ],
-                "1002": [
-                    {
-                        "transaction_id": "TXN_COST_101",
-                        "po_number": "PO-2024-003",
-                        "receipt_number": "RC-99013",
-                        "item_number": "AS54888",
-                        "quantity": 10,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ERROR",
-                        "error_message": "Subledger Journal Entry violates dynamic account combination rule 'UK_ACC_RULE'."
-                    }
-                ],
-                "1003": [
-                    {
-                        "transaction_id": "TXN_COST_201",
-                        "po_number": "PO-2024-004",
-                        "receipt_number": "RC-99014",
-                        "item_number": "CAD-ITEM-01",
-                        "quantity": 25,
-                        "unit_of_measure": "Kg",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ]
-            },
-            "Oct-24": {
-                "1001": [
-                    {
-                        "transaction_id": "TXN_COST_OCT_101",
-                        "po_number": "PO-2024-0101",
-                        "receipt_number": "RC-10011",
-                        "item_number": "AS54888",
-                        "quantity": 200,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ],
-                "1002": [
-                    {
-                        "transaction_id": "TXN_COST_OCT_201",
-                        "po_number": "PO-2024-0201",
-                        "receipt_number": "RC-20011",
-                        "item_number": "UK-ITEM-001",
-                        "quantity": 150,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ],
-                "1003": [
-                    {
-                        "transaction_id": "TXN_COST_OCT_301",
-                        "po_number": "PO-2024-0301",
-                        "receipt_number": "RC-30011",
-                        "item_number": "CAD-ITEM-01",
-                        "quantity": 25,
-                        "unit_of_measure": "Kg",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ]
-            },
-            "Nov-24": {
-                "1001": [
-                    {
-                        "transaction_id": "TXN_COST_NOV_101",
-                        "po_number": "PO-2024-1101",
-                        "receipt_number": "RC-11011",
-                        "item_number": "AS54888",
-                        "quantity": 300,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ],
-                "1002": [
-                    {
-                        "transaction_id": "TXN_COST_NOV_201",
-                        "po_number": "PO-2024-1102",
-                        "receipt_number": "RC-11012",
-                        "item_number": "UK-ITEM-005",
-                        "quantity": 100,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ],
-                "1003": [
-                    {
-                        "transaction_id": "TXN_COST_NOV_301",
-                        "po_number": "PO-2024-1103",
-                        "receipt_number": "RC-11013",
-                        "item_number": "CAD-ITEM-01",
-                        "quantity": 50,
-                        "unit_of_measure": "Kg",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ]
-            },
-            "Jan-25": {
-                "1001": [
-                    {
-                        "transaction_id": "TXN_COST_JAN_101",
-                        "po_number": "PO-2025-0101",
-                        "receipt_number": "RC-25011",
-                        "item_number": "AS54888",
-                        "quantity": 150,
-                        "unit_of_measure": "Ea",
-                        "costing_status": "COSTED",
-                        "accounting_status": "ACCOUNTED",
-                        "error_message": None
-                    }
-                ],
-                "1002": [],
-                "1003": []
-            }
-        }
+        def resolve(item):
+            item["CostingStatus"] = "COSTED"
+            item["AccountingStatus"] = "ACCOUNTED"
+            item["ErrorMessage"] = None
 
-        # ------------------------------------------------------------------ #
-        # 4. AP transactions for the 8-case test pack (ledger 1001, Dec-24)   #
-        # ------------------------------------------------------------------ #
-        # CASE 1 – AP invoice, unaccounted (accounting not yet created)
-        # CASE 2 – AP invoice, accounted but not yet transferred to GL
-        # CASE 7 – AP invoice, fully processed (negative control – must NOT flag)
-        self.ap_transactions = {
-            "Dec-24": {
-                "1001": [
-                    {
-                        "record_id": "TEST-AP-INV-001",
-                        "module": "Payables",
-                        "period": "Dec-24",
-                        "supplier": "TEST-SUPPLIER-OMEGA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-1",
-                        "accounting_status": "NOT_ACCOUNTED",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "next_step": "Run Create Accounting for this invoice (accounting not yet created).",
-                    },
-                    {
-                        "record_id": "TEST-AP-INV-002",
-                        "module": "Payables",
-                        "period": "Dec-24",
-                        "supplier": "TEST-SUPPLIER-OMEGA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-2",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "next_step": "Run Transfer Journal Entries to GL for this invoice.",
-                    },
-                    {
-                        "record_id": "TEST-AP-INV-007",
-                        "module": "Payables",
-                        "period": "Dec-24",
-                        "supplier": "TEST-SUPPLIER-OMEGA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-7",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    },
-                ],
-                "1002": [
-                    {
-                        "record_id": "AP-INV-DEC-201",
-                        "module": "Payables",
-                        "period": "Dec-24",
-                        "supplier": "BRIT-IMPORTS-LTD",
-                        "description": "UK standard freight invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AP-INV-DEC-301",
-                        "module": "Payables",
-                        "period": "Dec-24",
-                        "supplier": "MAPLE-DIST-INC",
-                        "description": "Canadian packaging supplier invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Nov-24": {
-                "1001": [
-                    {
-                        "record_id": "AP-INV-A401",
-                        "module": "Payables",
-                        "period": "Nov-24",
-                        "supplier": "TECH-PARTS-CORP",
-                        "description": "US hardware parts invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "AP-INV-B901",
-                        "module": "Payables",
-                        "period": "Nov-24",
-                        "supplier": "UK-VENDOR-DELTA",
-                        "description": "UK logistics services invoice requiring accounting",
-                        "accounting_status": "NOT_ACCOUNTED",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "next_step": "Run Create Accounting for AP-INV-B901, then Transfer to GL.",
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AP-INV-A501",
-                        "module": "Payables",
-                        "period": "Nov-24",
-                        "supplier": "CANWEST-SUPPLIES",
-                        "description": "Calgary distribution invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Oct-24": {
-                "1001": [
-                    {
-                        "record_id": "AP-INV-A101",
-                        "module": "Payables",
-                        "period": "Oct-24",
-                        "supplier": "ACME-SUPPLIES-INC",
-                        "description": "Oct manufacturing supplies",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "AP-INV-A201",
-                        "module": "Payables",
-                        "period": "Oct-24",
-                        "supplier": "BRIT-IMPORTS-LTD",
-                        "description": "Oct UK imports invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AP-INV-A301",
-                        "module": "Payables",
-                        "period": "Oct-24",
-                        "supplier": "MAPLE-DIST-INC",
-                        "description": "Oct Maple distribution invoice",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Jan-25": {
-                "1001": [],
-                "1002": [],
-                "1003": []
-            }
-        }
-
-        # ------------------------------------------------------------------ #
-        # 5. AR transactions for the 8-case test pack (ledger 1001, Dec-24)   #
-        # ------------------------------------------------------------------ #
-        # CASE 3 – AR invoice, unaccounted
-        # CASE 4 – AR invoice, accounted but not transferred to GL
-        # CASE 8 – AR invoice, fully processed (negative control – must NOT flag)
-        self.ar_transactions = {
-            "Dec-24": {
-                "1001": [
-                    {
-                        "record_id": "TEST-AR-INV-003",
-                        "module": "Receivables",
-                        "period": "Dec-24",
-                        "customer": "TEST-CUSTOMER-ALPHA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-3",
-                        "accounting_status": "NOT_ACCOUNTED",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "next_step": "Run Create Accounting for this transaction (accounting not yet created).",
-                    },
-                    {
-                        "record_id": "TEST-AR-INV-004",
-                        "module": "Receivables",
-                        "period": "Dec-24",
-                        "customer": "TEST-CUSTOMER-ALPHA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-4",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "next_step": "Run Transfer Journal Entries to GL for this transaction.",
-                    },
-                    {
-                        "record_id": "TEST-AR-INV-008",
-                        "module": "Receivables",
-                        "period": "Dec-24",
-                        "customer": "TEST-CUSTOMER-ALPHA",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-8",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    },
-                ],
-                "1002": [
-                    {
-                        "record_id": "AR-INV-DEC-201",
-                        "module": "Receivables",
-                        "period": "Dec-24",
-                        "customer": "LONDON-TECH-PLC",
-                        "description": "London software consulting bill",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AR-INV-DEC-301",
-                        "module": "Receivables",
-                        "period": "Dec-24",
-                        "customer": "TORONTO-INDUSTRIAL",
-                        "description": "Toronto industrial goods bill",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Nov-24": {
-                "1001": [
-                    {
-                        "record_id": "AR-INV-A401",
-                        "module": "Receivables",
-                        "period": "Nov-24",
-                        "customer": "WESTCOAST-RETAIL",
-                        "description": "Nov retail revenue transaction",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "AR-INV-A201",
-                        "module": "Receivables",
-                        "period": "Nov-24",
-                        "customer": "LONDON-TECH-PLC",
-                        "description": "Nov UK cloud services bill",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AR-INV-A501",
-                        "module": "Receivables",
-                        "period": "Nov-24",
-                        "customer": "CALGARY-LOGISTICS",
-                        "description": "Nov freight revenue transaction",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Oct-24": {
-                "1001": [
-                    {
-                        "record_id": "AR-INV-A101",
-                        "module": "Receivables",
-                        "period": "Oct-24",
-                        "customer": "NORTHSTAR-RETAIL",
-                        "description": "Oct Northstar billing",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "AR-INV-A201",
-                        "module": "Receivables",
-                        "period": "Oct-24",
-                        "customer": "LONDON-TECH-PLC",
-                        "description": "Oct London tech billing",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "AR-INV-A301",
-                        "module": "Receivables",
-                        "period": "Oct-24",
-                        "customer": "TORONTO-INDUSTRIAL",
-                        "description": "Oct Toronto industrial billing",
-                        "accounting_status": "ACCOUNTED",
-                        "transfer_status": "TRANSFERRED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Jan-25": {
-                "1001": [],
-                "1002": [],
-                "1003": []
-            }
-        }
-
-        # ------------------------------------------------------------------ #
-        # 6. Inventory transactions for the 8-case test pack                  #
-        # ------------------------------------------------------------------ #
-        # CASE 5 – Receipt approved, NOT yet transferred to Cost Management
-        # CASE 6 – Receipt transferred to Cost Management but NOT yet costed
-        # (Cases 7 & 8 negative controls are covered in AP/AR tables above)
-        self.inventory_transactions = {
-            "Dec-24": {
-                "1001": [
-                    {
-                        "record_id": "TEST-INV-RCT-005",
-                        "module": "Inventory / Cost Management",
-                        "period": "Dec-24",
-                        "organization": "TEST-ORG-M1",
-                        "item": "TEST-ITEM-XZ100",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-5",
-                        "transfer_status": "NOT_TRANSFERRED",
-                        "costing_status": "NOT_COSTED",
-                        "next_step": (
-                            "Transfer inventory transaction to Cost Management "
-                            "(cost processor has not yet picked up this receipt)."
-                        ),
-                    },
-                    {
-                        "record_id": "TEST-INV-RCT-006",
-                        "module": "Inventory / Cost Management",
-                        "period": "Dec-24",
-                        "organization": "TEST-ORG-M1",
-                        "item": "TEST-ITEM-XZ100",
-                        "description": "TEST_PACK_2024-12_OWNER:QA Period-Close Case-6",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "NOT_COSTED",
-                        "next_step": (
-                            "Cost this transaction in Cost Management "
-                            "(transferred but cost processor has not completed costing)."
-                        ),
-                    },
-                ],
-                "1002": [
-                    {
-                        "record_id": "INV-RCT-DEC-201",
-                        "module": "Inventory / Cost Management",
-                        "period": "Dec-24",
-                        "organization": "UK-PLANT-LON",
-                        "item": "UK-ITEM-001",
-                        "description": "UK inventory movement fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "INV-RCT-DEC-301",
-                        "module": "Inventory / Cost Management",
-                        "period": "Dec-24",
-                        "organization": "CA-PLANT-TOR",
-                        "item": "CAD-ITEM-01",
-                        "description": "Canada inventory receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Nov-24": {
-                "1001": [
-                    {
-                        "record_id": "INV-RCT-A401",
-                        "module": "Inventory / Cost Management",
-                        "period": "Nov-24",
-                        "organization": "MFG-PLANT-01",
-                        "item": "COMP-CPU-001",
-                        "description": "Nov US warehouse receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "INV-RCT-B901",
-                        "module": "Inventory / Cost Management",
-                        "period": "Nov-24",
-                        "organization": "UK-PLANT-LON",
-                        "item": "UK-ITEM-005",
-                        "description": "Item in Cost Management queue but not yet costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "NOT_COSTED",
-                        "next_step": "Run Cost Accounting process for UK-PLANT-LON.",
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "INV-RCT-A501",
-                        "module": "Inventory / Cost Management",
-                        "period": "Nov-24",
-                        "organization": "CA-PLANT-TOR",
-                        "item": "CAD-ITEM-01",
-                        "description": "Nov Canada warehouse receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Oct-24": {
-                "1001": [
-                    {
-                        "record_id": "INV-RCT-A101",
-                        "module": "Inventory / Cost Management",
-                        "period": "Oct-24",
-                        "organization": "MFG-PLANT-01",
-                        "item": "AS54888",
-                        "description": "Oct US warehouse receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ],
-                "1002": [
-                    {
-                        "record_id": "INV-RCT-A201",
-                        "module": "Inventory / Cost Management",
-                        "period": "Oct-24",
-                        "organization": "UK-PLANT-LON",
-                        "item": "UK-ITEM-001",
-                        "description": "Oct UK warehouse receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ],
-                "1003": [
-                    {
-                        "record_id": "INV-RCT-A301",
-                        "module": "Inventory / Cost Management",
-                        "period": "Oct-24",
-                        "organization": "CA-PLANT-TOR",
-                        "item": "CAD-ITEM-01",
-                        "description": "Oct Canada warehouse receipt fully costed",
-                        "transfer_status": "TRANSFERRED",
-                        "costing_status": "COSTED",
-                        "next_step": None,
-                    }
-                ]
-            },
-            "Jan-25": {
-                "1001": [],
-                "1002": [],
-                "1003": []
-            }
-        }
-
-        # Adapt mock database based on the active scenario for Dec-24
-        dec_txns = self.transactions["Dec-24"]
         if self.scenario_name == "all_clear":
-            # Fix all costing errors across all ledgers in Dec-24
-            for ledger_id in dec_txns:
-                for txn in dec_txns[ledger_id]:
-                    txn["costing_status"] = "COSTED"
-                    txn["accounting_status"] = "ACCOUNTED"
-                    txn["error_message"] = None
+            for item in cost.values():
+                resolve(item)
         elif self.scenario_name == "po_costing_hold_only":
             # Only Ledger 1001 has errors, ledger 1002 is cleared
-            dec_txns["1002"][0]["accounting_status"] = "ACCOUNTED"
-            dec_txns["1002"][0]["error_message"] = None
+            resolve(cost["TXN_COST_101"])
         elif self.scenario_name == "unaccounted_hold_only":
             # Only Ledger 1002 has errors, ledger 1001 is cleared
-            dec_txns["1001"][1]["costing_status"] = "COSTED"
-            dec_txns["1001"][1]["accounting_status"] = "ACCOUNTED"
-            dec_txns["1001"][1]["error_message"] = None
+            resolve(cost["TXN_COST_002"])
 
-    def get_ledgers(self):
-        return self.ledgers
+    # -- transport ---------------------------------------------------------
+    def _make_request(self, endpoint: str, method: str = "GET", data: dict = None) -> dict:
+        url = self._build_url(endpoint)
+        logger.debug(f"[mock] {method} {url}")
+        try:
+            return self._dispatch(url, method, data)
+        except _MockHttpError as e:
+            body = json.dumps({"title": e.title, "status": str(e.code)})
+            logger.error(f"HTTP Error {e.code}: {body}")
+            raise Exception(f"Oracle Fusion API Error {e.code}: {body}")
 
-    def get_period_statuses(self, ledger_id: str, period_name: str):
-        p_data = self.period_statuses.get(period_name)
-        if not p_data:
-            return {"GL": "Never Opened", "COST": "Never Opened"}
-        return p_data.get(ledger_id, {"GL": "Never Opened", "COST": "Never Opened"})
+    def _dispatch(self, url: str, method: str, data: dict) -> dict:
+        parsed = urllib.parse.urlsplit(url)
+        prefix = REST_ROOT + "/"
+        if not parsed.path.startswith(prefix):
+            raise _MockHttpError(404, "Resource not found")
+        resource = parsed.path[len(prefix):]
+        if resource not in self._store:
+            raise _MockHttpError(404, f"Resource not found: {resource}")
+        params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 
-    def get_costing_transactions(self, ledger_id: str, period_name: str):
-        p_txns = self.transactions.get(period_name, {})
-        txns = p_txns.get(ledger_id, [])
-        blockers = []
-        for t in txns:
-            if t["costing_status"] in ["ERROR", "UNPROCESSED"] or t["accounting_status"] in ["ERROR", "NOT_ACCOUNTED"]:
-                blockers.append(t)
-        return blockers
+        if method == "GET":
+            return self._get_collection(resource, params)
+        if method == "POST" and resource == "ledgerPeriods":
+            return self._post_ledger_period(data or {})
+        raise _MockHttpError(405, "Method not allowed")
 
-    def close_period(self, ledger_id: str, period_name: str, application: str) -> bool:
-        if period_name not in self.period_statuses:
-            raise Exception(f"Cannot close unrecognized period '{period_name}' in mock environment.")
+    def _get_collection(self, resource: str, params: dict) -> dict:
+        predicate = _parse_filter(params.get("q", [""])[0])
+        try:
+            limit = int(params.get("limit", [self.DEFAULT_LIMIT])[0])
+            offset = int(params.get("offset", [0])[0])
+        except ValueError:
+            raise _MockHttpError(400, "limit and offset must be integers")
+        if limit < 1 or offset < 0:
+            raise _MockHttpError(400, "Invalid limit or offset")
 
-        blockers = self.get_costing_transactions(ledger_id, period_name)
-        if application == "COST" and blockers:
-            raise Exception(f"Cannot close costing period: {len(blockers)} unprocessed or errored transactions exist.")
+        matches = [row for row in self._store[resource] if predicate(row)]
+        page = copy.deepcopy(matches[offset:offset + limit])
+        return {
+            "items": page,
+            "count": len(page),
+            "hasMore": offset + limit < len(matches),
+            "limit": limit,
+            "offset": offset,
+        }
 
-        if application == "GL":
-            stat = self.get_period_statuses(ledger_id, period_name)
-            if stat.get("COST") != "Closed":
-                raise Exception(f"Cannot close GL period: Costing period must be closed first.")
+    def _post_ledger_period(self, payload: dict) -> dict:
+        required = ("LedgerId", "PeriodName", "ApplicationId", "ClosingStatus")
+        if any(k not in payload for k in required):
+            raise _MockHttpError(400, "Missing required attributes")
 
-        p_statuses = self.period_statuses[period_name]
-        if ledger_id in p_statuses:
-            p_statuses[ledger_id][application] = "Closed"
-            return True
-        return False
+        def matching(app_id):
+            return next((p for p in self._store["ledgerPeriods"]
+                         if p["LedgerId"] == payload["LedgerId"]
+                         and p["PeriodName"] == payload["PeriodName"]
+                         and p["ApplicationId"] == app_id), None)
 
-    def get_ap_transactions(self, ledger_id: str, period_name: str):
-        p_ap = self.ap_transactions.get(period_name, {})
-        records = p_ap.get(ledger_id, [])
-        flags = []
-        for r in records:
-            if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
-                flags.append(r)
-        return flags
+        period = matching(payload["ApplicationId"])
+        if period is None:
+            raise _MockHttpError(404, f"Cannot close unrecognized period '{payload['PeriodName']}' in mock environment.")
 
-    def get_ar_transactions(self, ledger_id: str, period_name: str):
-        p_ar = self.ar_transactions.get(period_name, {})
-        records = p_ar.get(ledger_id, [])
-        flags = []
-        for r in records:
-            if r["accounting_status"] != "ACCOUNTED" or r["transfer_status"] != "TRANSFERRED":
-                flags.append(r)
-        return flags
+        if payload["ApplicationId"] == 10078:
+            blockers = [i for i in self._store["costTransactions"]
+                        if i["LedgerId"] == payload["LedgerId"]
+                        and i["PeriodName"] == payload["PeriodName"]
+                        and (i["CostingStatus"] in ("ERROR", "UNPROCESSED")
+                             or i["AccountingStatus"] in ("ERROR", "NOT_ACCOUNTED"))]
+            if blockers:
+                raise _MockHttpError(
+                    400, f"Cannot close costing period: {len(blockers)} unprocessed or errored transactions exist.")
+        elif payload["ApplicationId"] == 101:
+            cost_period = matching(10078)
+            if cost_period is None or cost_period["ClosingStatus"] != "Closed":
+                raise _MockHttpError(400, "Cannot close GL period: Costing period must be closed first.")
 
-    def get_inventory_transactions(self, ledger_id: str, period_name: str):
-        p_inv = self.inventory_transactions.get(period_name, {})
-        records = p_inv.get(ledger_id, [])
-        flags = []
-        for r in records:
-            if r["transfer_status"] != "TRANSFERRED" or r["costing_status"] == "NOT_COSTED":
-                flags.append(r)
-        return flags
+        period["ClosingStatus"] = payload["ClosingStatus"]
+        return copy.deepcopy(period)
